@@ -1,55 +1,103 @@
 {
- "generated": "2026-11-15 07:23 UTC",
- "checked_at": 1794727397,
- "input_hash": "5f3f18631f47d1c65a2a2b08939d0749d497ad9521dc3c39ddb7d892c0959cf8",
+ "generated": "2026-11-15 07:40 UTC",
+ "checked_at": 1794728405,
+ "input_hash": "311edac7821c753fbc1267b4eaed31f1fb3bb6b4c1bd6b0847733601bc7759ad",
  "series": [
   {
-   "id": "T_4h",
-   "symbol": "USDT.D",
-   "tf": "4H",
-   "source": "tv/CRYPTOCAP_USDT.D/4H",
-   "last_close": 1794715200,
-   "period_s": 14400
+   "id": "binance/BTCUSDT/1D",
+   "source": "binance",
+   "symbol": "BTCUSDT",
+   "tf": "1D",
+   "period_s": 86400,
+   "last_open": 1794614400,
+   "last_close": 1794700800,
+   "fetched_at": 1794701817,
+   "rows": 3377,
+   "frozen": false
   },
   {
-   "id": "C_4h",
+   "id": "binance/BTCUSDT/4H",
+   "source": "binance",
+   "symbol": "BTCUSDT",
+   "tf": "4H",
+   "period_s": 14400,
+   "last_open": 1794686400,
+   "last_close": 1794700800,
+   "fetched_at": 1794701432,
+   "rows": 20245,
+   "frozen": false
+  },
+  {
+   "id": "tv/COINBASE_BTCUSD/1D",
+   "source": "tv",
+   "symbol": "COINBASE_BTCUSD",
+   "tf": "1D",
+   "period_s": 86400,
+   "last_open": 1794441600,
+   "last_close": 1794528000,
+   "fetched_at": 1794549733,
+   "rows": 4331,
+   "frozen": true
+  },
+  {
+   "id": "tv/COINBASE_BTCUSD/4H",
+   "source": "tv",
+   "symbol": "COINBASE_BTCUSD",
+   "tf": "4H",
+   "period_s": 14400,
+   "last_open": 1794528000,
+   "last_close": 1794542400,
+   "fetched_at": 1794566427,
+   "rows": 6282,
+   "frozen": true
+  },
+  {
+   "id": "tv/CRYPTOCAP_USDC.D/1D",
+   "source": "tv",
+   "symbol": "USDC.D",
+   "tf": "1D",
+   "period_s": 86400,
+   "last_open": 1794441600,
+   "last_close": 1794528000,
+   "fetched_at": 1794566427,
+   "rows": 2884,
+   "frozen": true
+  },
+  {
+   "id": "tv/CRYPTOCAP_USDC.D/4H",
+   "source": "tv",
    "symbol": "USDC.D",
    "tf": "4H",
-   "source": "tv/CRYPTOCAP_USDC.D/4H",
+   "period_s": 14400,
+   "last_open": 1794700800,
    "last_close": 1794715200,
-   "period_s": 14400
+   "fetched_at": 1794727267,
+   "rows": 1909,
+   "frozen": false
   },
   {
-   "id": "B_4h",
-   "symbol": "BTCUSD",
-   "tf": "4H",
-   "source": "tv/COINBASE_BTCUSD/4H then binance/BTCUSDT/4H",
-   "last_close": 1794700800,
-   "period_s": 14400
-  },
-  {
-   "id": "T_1d",
+   "id": "tv/CRYPTOCAP_USDT.D/1D",
+   "source": "tv",
    "symbol": "USDT.D",
    "tf": "1D",
-   "source": "tv/CRYPTOCAP_USDT.D/1D then tv/CRYPTOCAP_USDT.D/4H",
-   "last_close": 1794700800,
-   "period_s": 86400
+   "period_s": 86400,
+   "last_open": 1794441600,
+   "last_close": 1794528000,
+   "fetched_at": 1794566427,
+   "rows": 4268,
+   "frozen": true
   },
   {
-   "id": "C_1d",
-   "symbol": "USDC.D",
-   "tf": "1D",
-   "source": "tv/CRYPTOCAP_USDC.D/1D then tv/CRYPTOCAP_USDC.D/4H",
-   "last_close": 1794700800,
-   "period_s": 86400
-  },
-  {
-   "id": "B_1d",
-   "symbol": "BTCUSD",
-   "tf": "1D",
-   "source": "tv/COINBASE_BTCUSD/1D then binance/BTCUSDT/1D",
-   "last_close": 1794700800,
-   "period_s": 86400
+   "id": "tv/CRYPTOCAP_USDT.D/4H",
+   "source": "tv",
+   "symbol": "USDT.D",
+   "tf": "4H",
+   "period_s": 14400,
+   "last_open": 1794700800,
+   "last_close": 1794715200,
+   "fetched_at": 1794727267,
+   "rows": 1909,
+   "frozen": false
   }
  ],
  "readings": [],

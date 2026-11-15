@@ -82,7 +82,8 @@ function build(s) {
 const used = new Set();
 for (const s of Object.values(cfg.sources)) for (const k of ['series', 'series_4h', 'then', 'then_4h', 'then_days_from_4h']) if (s[k]) used.add(s[k]);
 const inputs = [...used].sort().map((id) => [id, manifest[id] ? manifest[id].last_open + ':' + manifest[id].rows : 'missing']);
-const inputHash = crypto.createHash('sha256').update(JSON.stringify([inputs, cfg])).digest('hex');
+const FRESH_V = 2;                                    // freshness.json format (Market-Data series ids, read by Check dashboards)
+const inputHash = crypto.createHash('sha256').update(JSON.stringify([inputs, cfg, FRESH_V])).digest('hex');
 if (!FORCE && prevFresh && prevFresh.input_hash === inputHash) { console.log('No new closed candles since the last build; nothing rebuilt.'); process.exit(0); }
 
 // ---------- build ----------
@@ -106,15 +107,22 @@ for (const [id, s] of Object.entries(cfg.sources)) {
     docs[`snap/${id}-${k}`] = { t: part.map((r) => r.t), c: part.map((r) => round(r.c)), part: k, parts, at };
   }
   sources[id] = { at, rows: rows.length, parts };
-  const last = rows[rows.length - 1], from = [s.series || s.series_4h, s.then || s.then_4h || s.then_days_from_4h].filter(Boolean).join(' then ');
-  series.push({ id, symbol: { T: 'USDT.D', C: 'USDC.D', B: 'BTCUSD' }[id[0]], tf: s.use, source: from, last_close: last.t + SEC[s.use], period_s: SEC[s.use] });
+}
+// freshness: one entry per Market-Data series used, as read for this build (the format Check dashboards compares with
+// Market-Data's manifest: same id, last_open and rows). Frozen series are stored history and are marked so.
+const registry = fs.existsSync(path.join(MD, 'series.json')) ? (rd(path.join(MD, 'series.json')).series || {}) : {};
+for (const sid of [...used].sort()) {
+  const r = load(sid); if (!r || !r.length) continue;
+  const [src, sym, tf] = sid.split('/'), m = manifest[sid] || {};
+  series.push({ id: sid, source: src, symbol: sym.replace(/^CRYPTOCAP_/, ''), tf, period_s: SEC[tf], last_open: r[r.length - 1].t,
+    last_close: r[r.length - 1].t + SEC[tf], fetched_at: m.fetched_at || null, rows: r.length, frozen: !!(registry[sid] && registry[sid].frozen) });
 }
 docs['snap/meta'] = { at, sources, failed, v: 1 };
-const fresh = { generated: iso(NOW), checked_at: NOW, input_hash: inputHash, series: series.filter((x) => x.tf !== '1W'), readings: [], kept,
+const fresh = { generated: iso(NOW), checked_at: NOW, input_hash: inputHash, series, readings: [], kept,
   last_result: kept.length ? `${kept.length} source(s) kept their last good data.` : 'All sources built from closed candles.' };
 fs.mkdirSync(PUB, { recursive: true });
 fs.writeFileSync(path.join(PUB, 'snapshot.json'), JSON.stringify({ generated: at, docs }));
 fs.writeFileSync(path.join(PUB, 'freshness.json'), JSON.stringify(fresh, null, 1));
 console.log(`Built ${Object.keys(cfg.sources).length - failed.length}/${Object.keys(cfg.sources).length} sources at ${at}` + (failed.length ? `; kept last good: ${failed.join(', ')}` : ''));
-for (const x of series) console.log(`  ${x.id.padEnd(5)} ${x.tf}  last closed candle ends ${iso(x.last_close)}  (${x.source})`);
+for (const x of series) console.log(`  ${x.id.padEnd(24)} last closed candle ends ${iso(x.last_close)}  rows ${x.rows}${x.frozen ? '  (stored history, frozen)' : ''}`);
 for (const k of kept) console.log(`  KEPT ${k.id}: ${k.why}`);

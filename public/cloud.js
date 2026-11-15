@@ -21,7 +21,7 @@
 
   function showFresh(F) {
     var now = Date.now() / 1000;
-    var rows = F.series.map(function (s) {
+    var rows = F.series.filter(function (s) { return !s.frozen; }).map(function (s) {
       var behind = s.last_close ? Math.max(0, Math.floor((now - s.last_close) / s.period_s)) : null;
       var st = behind === null ? 'no data yet' : behind === 0 ? 'current' : behind + ' candle' + (behind > 1 ? 's' : '') + ' behind';
       return { label: esc(s.symbol + ' ' + s.tf) + ' <span style="opacity:.75">(' + esc(s.source) + ')</span>', when: t2s(s.last_close), st: st, flag: behind === null || behind > 1 };

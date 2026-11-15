@@ -1,0 +1,1340 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Stablecoin RSI Forecast</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: status bar with saved-snapshot time + Refresh (same as Bitcoin Dashboard), RSI(7) grid, tabs per driver ticker, one card per timeframe, method notes. */
+:root{
+  --bg:#f3f5f8; --panel:#ffffff; --ink:#12202c; --muted:#586878; --line:#dce2e9; --soft:#eaeef3;
+  --up:#0d8a5c; --up-bg:#e3f4ec; --dn:#c0410f; --dn-bg:#fbe9df; --acc:#2557d6; --acc-bg:#e4ebfb;
+  --warn:#9a6700; --warn-bg:#fff3cd; --wk:#8a97a6;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif; --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e141a; --panel:#151d25; --ink:#e5ecf3; --muted:#92a3b4; --line:#26323d; --soft:#1c2630;
+  --up:#41d09a; --up-bg:#0f2d24; --dn:#ff9265; --dn-bg:#33211a; --acc:#7ba5ff; --acc-bg:#182643;
+  --warn:#f2c14e; --warn-bg:#33290f; --wk:#6b7a8a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e141a; --panel:#151d25; --ink:#e5ecf3; --muted:#92a3b4; --line:#26323d; --soft:#1c2630;
+  --up:#41d09a; --up-bg:#0f2d24; --dn:#ff9265; --dn-bg:#33211a; --acc:#7ba5ff; --acc-bg:#182643;
+  --warn:#f2c14e; --warn-bg:#33290f; --wk:#6b7a8a; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 40px}
+.page{max-width:1240px;margin:0 auto;display:grid;gap:14px;min-width:0}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+/* status bar */
+.rf-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:10px}
+.rf-top{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between}
+.rf-card h1{font-size:22px;font-weight:600;margin:0;letter-spacing:-.01em}
+.rf-status{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.rf-pill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:500;background:var(--soft);color:var(--muted);white-space:nowrap}
+.rf-pill.acc{background:var(--acc-bg);color:var(--acc)} .rf-pill.warn{background:var(--warn-bg);color:var(--warn)} .rf-pill.ok{background:var(--up-bg);color:var(--up)} .rf-pill.bad{background:var(--dn-bg);color:var(--dn)}
+.rf-btn{font:inherit;font-weight:500;padding:6px 16px;border-radius:999px;border:1px solid var(--acc);background:var(--acc);color:var(--panel);cursor:pointer}
+.rf-btn.ghost{background:transparent;color:var(--acc)}
+.rf-btn:disabled{opacity:.5;cursor:default}
+.rf-prog{height:4px;border-radius:2px;background:var(--soft);overflow:hidden}
+.rf-prog i{display:block;height:100%;width:0;background:var(--acc);transition:width .4s}
+.rf-note{color:var(--muted);font-size:12.5px;line-height:1.45;margin:0}
+.rf-banner{border-radius:8px;padding:8px 12px;font-size:13px;background:var(--warn-bg);color:var(--warn)}
+.rf-banner.ok{background:var(--up-bg);color:var(--up)} .rf-banner.bad{background:var(--dn-bg);color:var(--dn)}
+.rf-empty{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:28px 16px;display:grid;gap:8px;justify-items:center;text-align:center}
+.rf-empty h2{font-size:16px;font-weight:600;margin:0}
+@media (prefers-reduced-motion:reduce){.rf-prog i{transition:none}}
+/* RSI grid */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0}
+.panel h2{font-size:16px;font-weight:600;margin:0 0 2px}
+.panel .note{font-size:12.5px;color:var(--muted);margin:0 0 10px}
+.scroll{overflow-x:auto}
+.grid{border-collapse:separate;border-spacing:4px;width:100%;font-variant-numeric:tabular-nums}
+.grid th{font-size:12px;font-weight:500;color:var(--muted);text-align:center;padding:2px 6px;white-space:nowrap}
+.grid th:first-child{text-align:left}
+.grid td{text-align:center;padding:8px 6px;border-radius:6px;font-family:var(--mono);font-size:15px;background:var(--soft);white-space:nowrap;min-width:5rem}
+.grid td:first-child{text-align:left;font-family:var(--sans);font-size:13px;font-weight:600;background:none;min-width:7rem}
+.grid td.os{background:var(--acc-bg);color:var(--acc);font-weight:500}
+.grid td.ob{background:var(--warn-bg);color:var(--warn);font-weight:500}
+.grid td small{display:block;font-family:var(--sans);font-size:11px;color:var(--muted);font-weight:400}
+/* tabs */
+.tabs{display:inline-flex;flex-wrap:wrap;gap:2px;padding:3px;border-radius:12px;background:color-mix(in srgb,var(--ink) 8%,transparent);align-self:flex-start;justify-self:start}
+.tabs button{font:inherit;background:none;border:0;border-radius:10px;color:var(--muted);padding:5px 12px;cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--bg);background:var(--ink);font-weight:600}
+.lede{font-size:13px;color:var(--muted);margin:0}
+.lede b{color:var(--ink);font-weight:600}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-content:start;min-width:0;overflow-wrap:break-word}
+.card > *{min-width:0}
+.card-head{display:flex;justify-content:space-between;align-items:baseline;gap:6px 8px;flex-wrap:wrap}
+.card-head > span{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;justify-content:flex-end}
+.card-head h3{margin:0;font-size:15px;font-weight:600}
+.rsi-pill{white-space:nowrap;font-family:var(--mono);font-size:13px;padding:2px 10px;border-radius:999px;background:var(--soft);color:var(--ink)}
+.rsi-pill.os{background:var(--acc-bg);color:var(--acc)} .rsi-pill.ob{background:var(--warn-bg);color:var(--warn)}
+.state{font-size:12.5px;color:var(--muted);margin:0}
+.target{border-top:1px solid var(--line);padding-top:10px}
+.target .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.target .big{font-family:var(--mono);font-size:24px;line-height:1.25;margin-top:2px;overflow-wrap:anywhere}
+.target .rng{font-size:12.5px;color:var(--muted)}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;margin-left:6px;vertical-align:middle;font-family:var(--sans)}
+.tag.warn{background:var(--warn-bg);color:var(--warn)}
+.vals{display:grid;grid-template-columns:auto 1fr auto auto;gap:4px 10px;font-size:13px;font-variant-numeric:tabular-nums;align-items:baseline}
+.vals .h{font-size:11.5px;color:var(--muted)}
+.vals .n{font-weight:600}
+.vals .r{text-align:right;font-family:var(--mono)}
+.vals .drv{color:var(--acc)}
+.pos{color:var(--up)} .neg{color:var(--dn)}
+.vals2{display:grid;gap:8px;font-size:13px;font-variant-numeric:tabular-nums}
+.vals2 .h{font-size:11.5px;color:var(--muted)}
+.tk{display:grid;gap:1px;min-width:0}
+.tk-top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline}
+.tk-top .n{font-weight:600}
+.tk-top > *{min-width:0}
+.tk-top .r{font-family:var(--mono);font-size:12.5px;text-align:right;margin-left:auto;overflow-wrap:anywhere}
+.tk-top b{font-weight:500}
+.tk-sub{font-size:11.5px;color:var(--muted)}
+.drv{color:var(--acc)}
+.bstat{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:11.5px;padding:2px 8px;border-radius:999px;background:var(--soft);color:var(--muted)}
+.chip.ok{background:var(--up-bg);color:var(--up);font-weight:600}
+.chip.warn{background:var(--warn-bg);color:var(--warn);font-weight:600}
+.chip.bad{background:var(--dn-bg);color:var(--dn);font-weight:600}
+.lowconf{border-radius:8px;padding:8px 12px;font-size:12.5px;line-height:1.45;background:var(--warn-bg);color:var(--warn)}
+.lowconf b{font-weight:600}
+.lowtag{color:var(--warn);font-weight:600}
+.live{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
+.spark{width:100%;height:auto;display:block}
+.spark text{fill:var(--muted);font-family:var(--mono);font-size:9px}
+.next{font-size:12.5px;color:var(--muted);margin:0}
+.next b{color:var(--ink);font-weight:600}
+details{font-size:12.5px}
+details summary{cursor:pointer;color:var(--acc);font-weight:500}
+.ep{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;margin-top:6px;font-size:12px}
+.ep th,.ep td{padding:3px 4px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.ep td:nth-child(-n+2),.ep td.st,.ep th{white-space:normal}
+.ep{font-size:11.5px}
+.ep th{color:var(--muted);font-weight:500}
+.ep th:first-child,.ep td:first-child{text-align:left}
+.foot{font-size:11.5px;color:var(--muted);margin:0}
+.ep td.later{color:var(--dn);font-weight:600} .ep td.earlier{color:var(--up);font-weight:600} .ep td.flip{color:var(--acc);font-weight:600}
+.ep td.st{text-align:left}
+.tent{border:1px dashed var(--warn);border-radius:8px;padding:10px 12px;display:grid;gap:10px;background:color-mix(in srgb,var(--warn-bg) 45%,transparent)}
+.tent .lbl{font-size:12px;color:var(--warn);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.tent .leg{display:grid;gap:2px}
+.tent .leg+.leg{border-top:1px solid var(--line);padding-top:8px}
+.tent .leg-h{font-size:12.5px;color:var(--muted)}
+.tent .big{font-family:var(--mono);font-size:20px;line-height:1.25;overflow-wrap:anywhere}
+.tent .rng{font-size:12px;color:var(--muted)}
+.tent .tv{gap:2px;margin-top:4px}
+.tent .tv .tk-top{font-size:12.5px}
+.method{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:8px}
+.method h2{font-size:16px;font-weight:600;margin:0}
+.method ul{margin:0;padding-left:18px;color:var(--muted);font-size:13px;line-height:1.6;max-width:80ch}
+.method b{color:var(--ink)}
+.no-data .tabs,.no-data #views,.no-data #gridPanel,.no-data #divPanel{display:none}
+/* divergence */
+.grid.dv td{font-family:var(--sans);font-size:12.5px;white-space:normal;text-align:left;min-width:8.5rem;vertical-align:top;line-height:1.4}
+.grid.dv td b{font-weight:600;display:block;font-size:13px}
+.grid.dv td.up{background:var(--up-bg);color:var(--up)} .grid.dv td.dn{background:var(--dn-bg);color:var(--dn)}
+.grid.dv td.fm{background:var(--warn-bg);color:var(--warn)} .grid.dv td.fl{color:var(--muted)}
+.grid.dv td small{font-size:11px}
+.gate{border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.5;display:grid;gap:4px;margin-bottom:10px;background:var(--soft);color:var(--ink)}
+.gate.open{background:var(--up-bg)} .gate.top{background:var(--dn-bg)}
+.gate .gh{font-weight:600} .gate .gs{font-size:12.5px;color:var(--muted)}
+.divline{font-size:12.5px;margin:0;padding:6px 10px;border-radius:8px;background:var(--soft);color:var(--muted)}
+.divline.up{background:var(--up-bg);color:var(--up)} .divline.dn{background:var(--dn-bg);color:var(--dn)} .divline.fm{background:var(--warn-bg);color:var(--warn)}
+.divline b{font-weight:600}
+.grid.dv td.pl{background:var(--acc-bg);color:var(--acc)} .divline.pl{background:var(--acc-bg);color:var(--acc)}
+#divHist{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+#divHist > summary{font-size:14px}
+.hctl{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.hctl select{font:inherit;font-size:13px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.hsum{display:grid;gap:8px;margin-bottom:8px}
+.hsum .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.hsum .row > b{font-size:12.5px;font-weight:600;min-width:9rem}
+#dhCsv{width:100%;min-height:9rem;font:11.5px var(--mono);background:var(--soft);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px;margin-top:6px}
+.ep td.o-pl{color:var(--acc);font-weight:600} .ep td.o-fl{color:var(--dn);font-weight:600} .ep td.o-ex{color:var(--muted)} .ep td.o-op{color:var(--warn);font-weight:600}
+</style>
+
+<div class="page">
+  <section class="rf-card" aria-label="Data status">
+    <div class="rf-top">
+      <h1>Stablecoin RSI Clock</h1>
+      <div class="rf-status">
+        <span id="rfAt" class="rf-pill">No saved snapshot yet</span>
+        <span id="rfStale" class="rf-pill warn" hidden></span>
+        <span id="rfFailed" class="rf-pill bad" hidden></span>
+        <button id="rfMissing" class="rf-btn ghost" type="button" hidden>Fetch missing</button>
+        <button id="rfBtn" class="rf-btn" type="button" hidden>Refresh from TradingView</button>
+      </div>
+    </div>
+    <div id="rfProgWrap" class="rf-prog" hidden><i id="rfProg"></i></div>
+    <p id="rfText" class="rf-note" hidden></p>
+    <div id="rfBanner" class="rf-banner" hidden></div>
+    <div id="rfRej" class="rf-banner bad" hidden></div>
+    <p class="rf-note">RSI period 7 on USDT.D + USDC.D across 4H, 8H, 1D, 3D and 1W, with BTCUSD shown as context on each card. 8H and 3D are built from the saved 4H and daily candles, so nothing extra is fetched. Each card from 8H up shows an early warning from the timeframe below it. Swings use 30/70 on 4H and 1D, and 40/60 on 1W. Opening the page shows the last saved snapshot. A scheduled task adds the latest candles after every 4H close; Refresh from TradingView pulls the full history.</p>
+  </section>
+
+  <div id="rfEmpty" class="rf-empty" hidden>
+    <h2 id="rfEmptyTitle">Loading the last saved snapshot…</h2>
+    <p id="rfEmptyNote" class="rf-note"></p>
+  </div>
+
+  <div id="root" class="page" style="gap:14px">
+    <section id="gridPanel" class="panel" aria-label="Current RSI 7">
+      <h2>RSI(7) now</h2>
+      <p class="note">Big number: RSI at the last candle that had closed when you refreshed; the projections use only these. Small: the forming candle's RSI and the value, as of that refresh. Blue is 30 or below, amber 70 or above (on 1W: 40 or below, 60 or above).</p>
+      <div class="scroll"><table class="grid" id="grid"></table></div>
+    </section>
+
+    <section id="divPanel" class="panel" aria-label="RSI 7 divergence">
+      <h2>RSI(7) divergence</h2>
+      <p class="note">Regular divergence between closes and RSI(7) on closed candles. Bearish: higher close high, lower RSI high. Bullish: lower close low, higher RSI low. <b>Confirmed</b> once two lower closes follow the second peak; <b>forming</b> means the second peak isn't confirmed yet; <b>played out</b> means RSI(7) has since reached the opposite zone (30 after a bearish one, 70 after a bullish one; 40/60 on 1W); <b>failed</b> means price closed beyond the second peak first. A status stays until one of those happens or the window ends (20 candles on 4H, 15 on 1D, 10 on 1W after the second peak). On USDT.D + USDC.D a bearish divergence points to a BTC low, so colours show what each one means for BTC: green BTC up, red BTC down, amber still forming.</p>
+      <div id="divGate"></div>
+      <div class="scroll"><table class="grid dv" id="divGrid"></table></div>
+      <details id="divHist">
+        <summary>Divergence history and hit rates</summary>
+        <p class="note" style="margin-top:8px">Every past RSI(7) divergence in the saved candles, found with the same rules as the live status and checked candle by candle with no look-ahead. Moves run from the confirmation close (two candles after the second peak) to the outcome close, or to the end of the window. ★ marks a divergence whose first peak was in the RSI zone (70/30, or 60/40 on 1W).</p>
+        <div class="hctl"><select id="dhK" aria-label="Ticker"></select><select id="dhTf" aria-label="Timeframe"></select></div>
+        <div id="dhSum" class="hsum"></div>
+        <div class="scroll"><table class="ep" id="dhTab"></table></div>
+        <p class="foot" id="dhFoot"></p>
+        <details style="margin-top:8px"><summary>CSV for your own analysis (all tickers and timeframes)</summary><textarea id="dhCsv" readonly spellcheck="false"></textarea></details>
+      </details>
+    </section>
+
+    <div class="tabs" role="tablist" id="tabs">
+      <button role="tab" type="button" data-v="U" aria-selected="true">USDT.D + USDC.D</button>
+    </div>
+    <div id="views" style="display:grid;gap:12px">
+      <p class="lede" id="lede"></p>
+      <div class="cards" id="cards"></div>
+    </div>
+  </div>
+
+  <section class="method">
+    <h2>How the estimates are made</h2>
+    <ul>
+      <li><b>RSI(7), Wilder smoothing</b> on USDT.D + USDC.D, the sum of the two dominance closes on matching candles. BTCUSD (Coinbase) is loaded only to show how BTC behaved during past dominance swings and where it typically was at the target close; it does not set any swing.</li>
+      <li><b>Early warning from the timeframe below (added 14 Nov 2026).</b> A higher-timeframe RSI(7) extreme almost never happens without the timeframe below getting there first (4H before 8H, 8H before 1D, 1D before 3D, 3D before 1W). When the lower one first closes at 70 (or 30) while the higher one is heading there, the card shows how often the higher one followed within 3 and 6 of its candles, next to the normal chance for any candle at that stage. In the 14 Nov study on USDT.D + USDC.D, 1D → 3D followed within 6 candles about 40% of the time against a normal 19%, and 3D → 1W about 85% against 40% (the 1W uses 60/40, so it follows sooner). Most early warnings still don't lead to the higher extreme within a few candles, so treat them as raised odds, not a signal. The odds are recalculated from the saved history every time the page loads. 1H is not used: TradingView holds only about 74 days of hourly dominance data, and the page updates once a day.</li>
+      <li><b>Date accuracy on every card.</b> Under each date the card shows how its date method did on past data: each past forecast used only swings that had finished by then, and the latest third was scored. In the 14 Nov study no method dated RSI extremes precisely: typically only 10–30% of dates fell within 25% of the actual wait. On the 3D card, a date built from the 15 most similar past 3D moments (RSI, how far the swing has run, and the daily RSI) beat the usual swing-length method (typical miss 13 vs 17 three-day candles, within 25%: 39% vs 23%), so the 3D card uses it whenever it still scores better on the saved history; the line under the date says which method is in use.</li>
+      <li><b>Weekly uses 40/60.</b> Full 30 ↔ 70 swings on the weekly chart happen only a few times per cycle, too few to date anything. The 1W cards therefore track swings between a close at or below 40 and a close at or above 60 (and back). They come more often, so there are more past swings to learn from, but each one is a smaller, trend-level move rather than a cycle extreme. Where the notes below say 30 and 70, read 40 and 60 for 1W.</li>
+      <li><b>Closed candles only.</b> A zone counts when a candle closes with RSI(7) at or above 70, or at or below 30. The card says when RSI left the zone and came back within the same swing, rather than implying it stayed there. A candle counts as closed only if it had closed when you pressed Refresh, so a candle that was forming at refresh time is never treated as closed later. The swing starts at the first such close; further closes in the same zone don't restart it, and a new 30 only counts after a close at 70 (and the reverse).</li>
+      <li><b>Next-close level.</b> Every card shows the exact close the next candle needs for RSI(7) to reach the target. This is calculated from the RSI formula, not estimated. When closed RSI is within 5 points of the target, this replaces the history-based date.</li>
+      <li><b>Dates</b> name the candle by its open time, the way TradingView labels it. The page takes past swings in the same direction that already lasted longer than the current one, and uses the median of their remaining candles; the 25th–75th percentile gives the range.</li>
+      <li><b>Values at the target close.</b> Two methods, chosen by a walk-forward backtest on 4H history back to January 2024 (USDT.D + USDC.D from January 2026) and daily history back to 2014–2018. <i>Swing start</i>: the median move of each ticker from start to end of past swings in the same direction, applied from its value at the start of the current swing. <i>Updated for the move so far</i>: once the swing is under way, the page picks the past swings that had moved about as much by the same stage (7–15 nearest) and applies their median remaining move to the value at the last closed candle. The 25th–75th percentile gives the range. Which one is used: 4H swings start with the first and switch to the second after one candle. Daily USDT.D + USDC.D does the same. Weekly is unchanged.</li>
+      <li><b>Measured accuracy</b> (held-out swings, the latest third, never used for tuning). BTC level at the target close, typical miss: 4H 1.8% (no change 2.2%, previous method 1.9%); daily 5.9% when shown (no change 6.7%, previous method 7.5%). For USDT.D + USDC.D 4H swings once under way the miss fell from 1.3% to 0.7%. Four in five 4H misses were under about 4%, daily under about 14%. The range held the actual close about 55–60% of the time on 4H and about half the time on daily.</li>
+      <li><b>Divergence (RSI 7).</b> Close pivots need 3 candles on the left and 2 on the right (2 and 2 on 1W); the two peaks must be 4–40 candles apart (3–30 on 1W) and the second within the last 20 candles on 4H, 15 on 1D and 10 on 1W. RSI must differ by more than 1 point. A divergence is played out when RSI(7) closes at the opposite zone before price closes beyond the second peak (that is a fail); if neither happens inside the window it expires. The history below uses exactly these rules on every past candle. Your rule is built in: the daily USDT.D + USDC.D status is the gate, and the 4H is only read once the daily shows a divergence, for a 4H divergence or RSI turning back from 70 (or 30). The weekly is context only.</li>
+      <li><b>BTC chips.</b> How often BTC moved the expected way in past swings (green 65%+, amber 55–65%), BTC's own RSI(7) when those swings ended, and how far BTC typically ranged inside a swing.</li>
+      <li><b>Lacks confirmation rules.</b> A card shows a date and levels only with 10 or more completed swings in that direction; a date also needs at least 5 past swings longer than the current one. A value row is withheld if that ticker moved the expected way in under 55% of past swings or if past swings disagree on direction. The exact next-close RSI trigger is always shown because it is maths, not history.</li>
+      <li><b>Weekly tentative forecast (1W card).</b> Weekly history is short, so the confirmation rules above rarely allow a weekly date. This box gives one anyway, clearly marked as limited data. Step 1 is the next leg (USDT.D + USDC.D RSI(7) at the next 60 or 40, which has tended to line up with the next BTC low or high); step 2 is the turn after it. The estimate comes from past weekly USDT.D + USDC.D swings that already ran longer than the current one, blended with an RSI momentum estimate. Values are BTC's median move across those past swings. It is hidden when the card already has a confirmed weekly date, so a card never shows two dates for the same close.</li>
+      <li><b>Forecast history.</b> Each card keeps a log of what it said, saved once per new closed candle: the closed RSI, the level it was heading for, the expected candle and range, and the exact next-close trigger. The Shift column compares each forecast with the one before it, so you can see the date sliding later or pulling earlier, or the swing flipping. Entries are saved only when every series loaded cleanly, and the log keeps the latest 120 candles per card. It starts from the first time the page is opened after this change; it is not rebuilt for earlier candles.</li>
+      <li><b>Accuracy from the backtest.</b> Direction was right in roughly 56–72% of swings, depending on timeframe. Daily dates often missed by 20 or more candles, so use the range, not the single date. These are statistical estimates from past behaviour, not a forecast or financial advice.</li>
+    </ul>
+  </section>
+</div>
+
+<script src="shim.js"></script>
+<script>
+/* ---------- calculations and rendering ---------- */
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const TF = {
+    '4h': { sec: 14400, label: '4 hour', short: '4H', iv: '4h', count: 6500 },
+    '8h': { sec: 28800, label: '8 hour', short: '8H', from: '4h' },
+    '1d': { sec: 86400, label: 'Daily', short: '1D', iv: '1D', count: 5000 },
+    '3d': { sec: 259200, label: '3 day', short: '3D', from: '1d' },
+    '1w': { sec: 604800, label: 'Weekly', short: '1W', iv: '1W', count: 520 },
+  };
+  const SYM = { T: 'CRYPTOCAP:USDT.D', C: 'CRYPTOCAP:USDC.D', B: 'COINBASE:BTCUSD' };
+  const NAME = { U: 'USDT.D + USDC.D', B: 'BTCUSD' };
+  // Only USDT.D + USDC.D is shown (tab, RSI grid, divergence, forecast log). BTCUSD is loaded as context only:
+  // its level and behaviour appear on the USDT.D + USDC.D cards (value rows, BTC chips, past-swing table).
+  const SHOW = ['U'];
+  const KEYS = ['U', 'B'];
+  // CORE = tickers that set the shared weekly forecast and the conflict check: only USDT.D + USDC.D now.
+  const CORE = ['U'];
+  const RISK = { U: -1, B: 1 }; // dominance moves against BTC
+  const P = 7, LOOK = 180;
+  // RSI zones: 30/70 on 4H and daily; weekly uses 40/60 swings (more weekly samples)
+  const ZN = (tf) => tf === '1w' ? { lo: 40, hi: 60 } : { lo: 30, hi: 70 };
+  const RAW = {};
+  const withHist = (id, s) => s;
+  let view = 'U';
+  try { const v = localStorage.getItem('src-view'); if (v && SHOW.includes(v)) view = v; } catch (e) {}
+
+  /* ---- math ---- */
+  function rsiSeries(c) {
+    const out = new Array(c.length).fill(null);
+    if (c.length <= P) return { r: out, st: null };
+    let g = 0, l = 0;
+    for (let i = 1; i <= P; i++) { const d = c[i] - c[i - 1]; g += Math.max(d, 0); l += Math.max(-d, 0); }
+    g /= P; l /= P;
+    out[P] = l === 0 ? 100 : 100 - 100 / (1 + g / l);
+    for (let i = P + 1; i < c.length; i++) {
+      const d = c[i] - c[i - 1];
+      g = (g * (P - 1) + Math.max(d, 0)) / P; l = (l * (P - 1) + Math.max(-d, 0)) / P;
+      out[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l);
+    }
+    return { r: out, st: { g, l, last: c[c.length - 1] } };
+  }
+  const q = (arr, p) => { if (!arr.length) return null; const a = arr.slice().sort((x, y) => x - y); const i = (a.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i); return a[lo] + (a[hi] - a[lo]) * (i - lo); };
+  function extremes(r, tf) {
+    const Z = ZN(tf); const ex = []; let last = null;
+    for (let i = 0; i < r.length; i++) {
+      const v = r[i]; if (v == null) continue;
+      if (v <= Z.lo && last !== 'L') { ex.push({ type: 'L', i }); last = 'L'; }
+      else if (v >= Z.hi && last !== 'H') { ex.push({ type: 'H', i }); last = 'H'; }
+    }
+    return ex;
+  }
+  function align(a, b) { // -> {t, a, b} on shared timestamps
+    const m = new Map(); b.t.forEach((t, i) => m.set(t, b.c[i]));
+    const t = [], x = [], y = [];
+    a.t.forEach((tt, i) => { const v = m.get(tt); if (v != null && isFinite(v) && isFinite(a.c[i])) { t.push(tt); x.push(a.c[i]); y.push(v); } });
+    return { t, a: x, b: y };
+  }
+  function regress(y, x) { // beta of log-returns y on x over last LOOK
+    const al = align(y, x); const n = al.t.length;
+    const s = Math.max(1, n - LOOK);
+    const ry = [], rx = [];
+    for (let i = s; i < n; i++) { if (al.a[i - 1] > 0 && al.b[i - 1] > 0) { ry.push(Math.log(al.a[i] / al.a[i - 1])); rx.push(Math.log(al.b[i] / al.b[i - 1])); } }
+    if (rx.length < 20) return null;
+    const mx = rx.reduce((a, b) => a + b, 0) / rx.length, my = ry.reduce((a, b) => a + b, 0) / ry.length;
+    let sxy = 0, sxx = 0, syy = 0;
+    for (let i = 0; i < rx.length; i++) { sxy += (rx[i] - mx) * (ry[i] - my); sxx += (rx[i] - mx) ** 2; syy += (ry[i] - my) ** 2; }
+    if (!sxx) return null;
+    return { beta: sxy / sxx, r: syy ? sxy / Math.sqrt(sxx * syy) : 0, n: rx.length };
+  }
+  function closedOnly(s, tf) { // drop the still-forming candle
+    const n = s.t.length; if (!n) return s;
+    const asOf = s.at || Date.now() / 1000;
+    return s.t[n - 1] + TF[tf].sec > asOf ? { t: s.t.slice(0, -1), c: s.c.slice(0, -1) } : s;
+  }
+  /* 8H and 3D are built here from the saved 4H and 1D candles: 8H = 00/08/16 UTC blocks of two 4H candles,
+     3D = 3-day blocks counted from 1 Jan 1970 (TradingView's own 3D chart may start its blocks on a different day).
+     The block's close is its last candle's close, so a block still forming at refresh time is dropped by closedOnly. */
+  let SCACHE = {};
+  function derive(src, sec) {
+    if (!src) return null;
+    const t = [], c = []; let cur = null;
+    for (let i = 0; i < src.t.length; i++) {
+      const k = Math.floor(src.t[i] / sec);
+      if (k !== cur) { cur = k; t.push(k * sec); c.push(src.c[i]); } else c[c.length - 1] = src.c[i];
+    }
+    return { t, c, at: src.at };
+  }
+  function series(k, tf) {
+    const key = k + '_' + tf; if (key in SCACHE) return SCACHE[key];
+    return (SCACHE[key] = TF[tf].from ? derive(rawSeries(k, TF[tf].from), TF[tf].sec) : rawSeries(k, tf));
+  }
+  function rawSeries(k, tf) {
+    if (k === 'U') {
+      const t = RAW['T_' + tf], c = RAW['C_' + tf]; if (!t || !c) return null;
+      const al = align(t, c); return { t: al.t, c: al.a.map((v, i) => v + al.b[i]), at: Math.min(t.at || Infinity, c.at || Infinity) === Infinity ? null : Math.min(t.at || Infinity, c.at || Infinity) };
+    }
+    return withHist(k + '_' + tf, RAW[k + '_' + tf] || null);
+  }
+
+  const MIN_SWINGS = 10, MIN_COMPARABLE = 5, MIN_HIT = 0.55, MIN_LOW = 10, MIN_COMPARABLE_LOW = 5;
+  /* Which value method to use, by timeframe, driver and stage of the swing [start, under half its typical
+     length, half or more]. 'B' = median full move from the swing start; 'D' = nearest past swings by the
+     move so far, then their remaining move; null = no method beat "no change" in the held-out backtest,
+     so the level is withheld. Weekly is not in the table and keeps 'B'. KNN = neighbours used by 'D'. */
+  const RULES = {
+    '4h': { U: ['B', 'D', 'D'], B: ['B', 'D', 'D'], E: ['B', 'B', 'B'], X: ['B', 'B', 'B'], S: ['B', 'B', 'B'] },
+    '1d': { U: ['B', 'D', 'D'], B: [null, null, 'D'], E: [null, null, 'D'], X: [null, null, 'D'], S: [null, null, 'D'] },
+  };
+  const KNN = { '4h': { U: 15, B: 15 }, '1d': { U: 10, B: 15 } };
+  const ACC = { '4h': 'about ±2%', '1d': 'about ±6%' };
+  /* ---- multi-timeframe cascade (study 14 Nov 2026) ----
+     The lower timeframe almost always reaches 70 (or 30) before the higher one does. When it first gets there while the
+     higher timeframe is heading the same way, the higher timeframe's chance of following within 3 or 6 of its candles
+     rises well above normal. Rates are recalculated from the saved history on every load. */
+  const CAS = { '8h': '4h', '1d': '8h', '3d': '1d', '1w': '3d' };
+  const CAS_MIN = 10;
+  let ACCCACHE = {};
+  function hState(H, ex, sec) { // per higher-timeframe index: type of the last extreme so far, close time of the next one
+    const lastType = [], nextClose = []; let k = -1;
+    for (let i = 0; i < H.t.length; i++) {
+      while (k + 1 < ex.length && ex[k + 1].i <= i) k++;
+      lastType.push(k >= 0 ? ex[k].type : null); nextClose.push(k + 1 < ex.length ? H.t[ex[k + 1].i] + sec : null);
+    }
+    return { lastType, nextClose };
+  }
+  function cascade(drv, tf) {
+    const key = 'cas_' + drv + tf; if (key in ACCCACHE) return ACCCACHE[key];
+    const lt = CAS[tf]; const HF = series(drv, tf), LF = lt && series(drv, lt);
+    if (!lt || !HF || !LF) return (ACCCACHE[key] = null);
+    const H = closedOnly(HF, tf), L = closedOnly(LF, lt), Hs = TF[tf].sec, Ls = TF[lt].sec;
+    const rH = rsiSeries(H.c).r, rL = rsiSeries(L.c).r, eH = extremes(rH, tf), eL = extremes(rL, lt);
+    if (H.t.length < 31 || L.t.length < 31) return (ACCCACHE[key] = null);
+    const { lastType, nextClose } = hState(H, eH, Hs);
+    const hClose = H.t.map((t) => t + Hs);
+    const t0 = Math.max(L.t[0], H.t[0]), t1 = Math.min(L.t[L.t.length - 1], H.t[H.t.length - 1]);
+    const isExt = new Set(eH.map((e) => e.i));
+    const hAt = (tc) => { let lo = 0, hi = hClose.length - 1, j = -1; while (lo <= hi) { const m = (lo + hi) >> 1; if (hClose[m] <= tc) { j = m; lo = m + 1; } else hi = m - 1; } return j; };
+    const stats = {};
+    for (const tgt of ['H', 'L']) {
+      const from = tgt === 'H' ? 'L' : 'H'; let n = 0; const hit = [0, 0]; let bn = 0; const bh = [0, 0];
+      for (const e of eL) {
+        if (e.type !== tgt) continue; const tc = L.t[e.i] + Ls; if (tc < t0 || tc + 6 * Hs > t1 + Hs) continue;
+        const j = hAt(tc); if (j < 0 || lastType[j] !== from || nextClose[j] == null) continue; n++;
+        const rem = Math.ceil((nextClose[j] - tc) / Hs); if (rem <= 3) hit[0]++; if (rem <= 6) hit[1]++;
+      }
+      for (let i = 0; i < H.t.length; i++) {
+        if (lastType[i] !== from || isExt.has(i) || H.t[i] < t0 || H.t[i] + 6 * Hs > t1 || nextClose[i] == null) continue;
+        bn++; const rem = Math.round((nextClose[i] - hClose[i]) / Hs); if (rem <= 3) bh[0]++; if (rem <= 6) bh[1]++;
+      }
+      stats[tgt] = { n, p3: n ? hit[0] / n : null, p6: n ? hit[1] / n : null, bn, b3: bn ? bh[0] / bn : null, b6: bn ? bh[1] / bn : null };
+    }
+    // share of completed higher-timeframe swings where the lower timeframe got there first
+    let first = 0, tot = 0;
+    for (let j = 0; j + 1 < eH.length; j++) {
+      const s = eH[j], e = eH[j + 1]; if (H.t[s.i] < t0 || H.t[e.i] > t1) continue; tot++;
+      const a = hClose[s.i], b = hClose[e.i];
+      if (eL.some((x) => x.type === e.type && L.t[x.i] + Ls > a && L.t[x.i] + Ls <= b)) first++;
+    }
+    // now: did the lower timeframe reach the target since this higher-timeframe swing began?
+    let now = null;
+    if (eH.length) {
+      const last = eH[eH.length - 1], tgt = last.type === 'L' ? 'H' : 'L', since = hClose[last.i];
+      const touch = eL.filter((x) => x.type === tgt && L.t[x.i] + Ls > since).pop();
+      const lastClose = hClose[hClose.length - 1];
+      now = { tgt, touched: !!touch, at: touch ? L.t[touch.i] : null, ago: touch ? Math.max(0, Math.floor((lastClose - (L.t[touch.i] + Ls)) / Hs)) : null, rL: rL[rL.length - 1] };
+    }
+    return (ACCCACHE[key] = { lt, stats, first, tot, now });
+  }
+  /* Date accuracy on past data, walk-forward (each past forecast uses only swings that had finished by then),
+     scored on the latest third of past candles: share of dates within 25% of the actual wait, and the typical miss. */
+  function dateAccuracy(drv, tf, method) {
+    const key = 'acc_' + method + drv + tf; if (key in ACCCACHE) return ACCCACHE[key];
+    const F = series(drv, tf); if (!F) return (ACCCACHE[key] = null);
+    const D = closedOnly(F, tf), r = rsiSeries(D.c).r, ex = extremes(r, tf), n = D.t.length;
+    const rows = stateRows(drv, tf, method === 'knn');
+    const done = rows.filter((x) => x.end != null); if (done.length < 30) return (ACCCACHE[key] = null);
+    const split = done[Math.floor(done.length * 2 / 3)].i;
+    const errs = []; let ok = 0;
+    for (const s of done) {
+      if (s.i < split) continue;
+      const pred = method === 'knn' ? knnPredict(rows, s) : pagePredict(ex, s);
+      if (pred == null) continue;
+      const act = s.end - s.i; errs.push(Math.abs(pred.mid - act)); if (Math.abs(pred.mid - act) <= Math.max(1, 0.25 * act)) ok++;
+    }
+    return (ACCCACHE[key] = errs.length >= 20 ? { n: errs.length, within: ok / errs.length, miss: q(errs, 0.5) } : null);
+  }
+  function pagePredict(ex, s) { // the page's own date rule, using only swings finished before candle s.i
+    const durs = []; for (let j = 0; j + 1 < ex.length; j++) if (ex[j + 1].i <= s.i && ex[j].type === s.typ) durs.push(ex[j + 1].i - ex[j].i);
+    if (durs.length < MIN_LOW) return null;
+    const comp = durs.filter((d) => d > s.el).map((d) => d - s.el); if (comp.length < MIN_COMPARABLE_LOW) return null;
+    return { mid: Math.max(1, Math.round(q(comp, 0.5))), lo: Math.max(1, Math.round(q(comp, 0.25))), hi: Math.max(1, Math.round(q(comp, 0.75))) };
+  }
+  /* One row per closed candle inside a swing; with lower-timeframe state when withL (for the cascade-adjusted date). */
+  function stateRows(drv, tf, withL) {
+    const key = 'rows_' + drv + tf + (withL ? 'L' : ''); if (key in ACCCACHE) return ACCCACHE[key];
+    const D = closedOnly(series(drv, tf), tf), r = rsiSeries(D.c).r, ex = extremes(r, tf), sec = TF[tf].sec;
+    let L = null, rL = null, eL = null, idx = null, Ls = 0, Z = null;
+    if (withL) {
+      const lt = CAS[tf]; L = closedOnly(series(drv, lt), lt); rL = rsiSeries(L.c).r; Ls = TF[lt].sec; Z = ZN(lt);
+      idx = new Map(L.t.map((t, i) => [t, i]));
+    }
+    const rows = []; let k = -1;
+    const durs = [];
+    for (let i = 0; i < D.t.length; i++) {
+      while (k + 1 < ex.length && ex[k + 1].i <= i) k++;
+      if (k < 0 || r[i] == null) continue;
+      const s = ex[k], end = k + 1 < ex.length ? ex[k + 1].i : null, tgt = s.type === 'L' ? 'H' : 'L';
+      const row = { i, el: i - s.i, r: r[i], typ: s.type, end };
+      if (withL) {
+        const li = idx.get(D.t[i] + sec - Ls), ls = idx.get(D.t[s.i] + sec - Ls);
+        if (li == null || li < 3 || rL[li] == null || rL[li - 3] == null) continue;
+        const seg = rL.slice(ls != null ? ls : Math.max(0, li - 50), li + 1).filter((x) => x != null);
+        row.rl = rL[li]; row.rl3 = rL[li - 3]; row.lt = seg.some((x) => tgt === 'H' ? x >= Z.hi : x <= Z.lo) ? 1 : 0;
+      }
+      rows.push(row);
+    }
+    // typical swing length per direction, from swings finished before each row (for scaling elapsed)
+    for (const row of rows) {
+      const d = []; for (let j = 0; j + 1 < ex.length; j++) if (ex[j + 1].i <= row.i && ex[j].type === row.typ) d.push(ex[j + 1].i - ex[j].i);
+      row.mdur = d.length ? q(d, 0.5) : 10;
+    }
+    return (ACCCACHE[key] = rows);
+  }
+  function knnPredict(rows, s, K = 15) { // nearest past states (same direction, outcome known before now) by RSI, stage and lower-timeframe state
+    const tr = rows.filter((x) => x.end != null && x.end <= s.i && x.typ === s.typ); if (tr.length < 40) return null;
+    const f = (x) => [x.r / 10, Math.min(x.el / Math.max(s.mdur, 1), 3) * 2, x.rl / 10, (x.rl - x.rl3) / 10, x.lt * 2];
+    const v = f(s);
+    const nb = tr.map((x) => { const a = f(x); let d = 0; for (let j = 0; j < a.length; j++) d += (a[j] - v[j]) ** 2; return [d, x.end - x.i]; }).sort((a, b) => a[0] - b[0]).slice(0, K).map((x) => x[1]);
+    return { mid: Math.max(1, Math.round(q(nb, 0.5))), lo: Math.max(1, Math.round(q(nb, 0.25))), hi: Math.max(1, Math.round(q(nb, 0.75))) };
+  }
+  function project(drv, tf) {
+    const FULL = series(drv, tf); if (!FULL || FULL.c.length < 31) return null;
+    const D = closedOnly(FULL, tf);
+    const formingRsi = D.c.length < FULL.c.length ? rsiSeries(FULL.c).r.slice(-1)[0] : null;
+    const { r, st } = rsiSeries(D.c);
+    const n = D.c.length, now = r[n - 1];
+    const ex = extremes(r, tf); const Z = ZN(tf);
+    const base = { D, r, now, formingRsi, firstT: D.t[0], tf, drv, histN: FULL.histN || 0 };
+    if (!ex.length) return Object.assign(base, { none: true });
+    const last = ex[ex.length - 1];
+    const elapsed = n - 1 - last.i;
+    const target = last.type === 'L' ? Z.hi : Z.lo;
+    const pairs = [];
+    for (let k = 0; k + 1 < ex.length; k++) pairs.push({ from: ex[k].i, to: ex[k + 1].i, type: ex[k].type, bars: ex[k + 1].i - ex[k].i });
+    const same = pairs.filter((p) => p.type === last.type);
+    const opp = pairs.filter((p) => p.type !== last.type);
+    const sec = TF[tf].sec, tLast = D.t[n - 1];
+    Object.assign(base, { last, elapsed, target, count: same.length, startT: D.t[last.i] });
+    // did RSI stay in the zone for the whole swing, and where did it go in between?
+    const inZ = (v) => last.type === 'L' ? v <= Z.lo : v >= Z.hi;
+    const seg = r.slice(last.i, n);
+    base.cont = seg.every(inZ);
+    base.away = last.type === 'L' ? Math.max(...seg) : Math.min(...seg);
+    let lt = last.i; for (let i = last.i; i < n; i++) if (inZ(r[i])) lt = i;
+    base.lastTouchT = D.t[lt];
+    // exact close needed on the next candle for RSI(7) to reach the target (Wilder maths, not an estimate)
+    const k = target / (100 - target);
+    const dNeed = target === Z.hi ? 6 * (k * st.l - st.g) : 6 * st.l - 6 * st.g / k;
+    base.trigger = st.last + dNeed; base.near = Math.abs(now - target) <= 5;
+    base.nextT = D.t[n - 1] + sec;
+
+    // facts table: always shown
+    const maps = {};
+    for (const k of KEYS) { const X = series(k, tf); const m = new Map(); if (X) X.t.forEach((t, i) => m.set(t, X.c[i])); maps[k] = m; }
+    base.hist = same.slice(-6).reverse().map((p) => {
+      const b0 = maps.B.get(D.t[p.from]), b1 = maps.B.get(D.t[p.to]);
+      return { from: D.t[p.from], to: D.t[p.to], bars: p.bars, dMove: D.c[p.to] / D.c[p.from] - 1, bMove: b0 && b1 ? b1 / b0 - 1 : null };
+    });
+    if (same.length < MIN_LOW) return Object.assign(base, { thin: true });
+    base.low = same.length < MIN_SWINGS;
+    const need = base.low ? MIN_LOW : MIN_SWINGS, compNeed = base.low ? MIN_COMPARABLE_LOW : MIN_COMPARABLE;
+    base.compNeed = compNeed;
+
+    // date: only from past swings that already lasted longer than this one
+    const comp = same.map((p) => p.bars).filter((d) => d > elapsed).map((d) => d - elapsed);
+    base.comparable = comp.length;
+    if (comp.length >= compNeed) {
+      const nMed = Math.max(1, Math.round(q(comp, 0.5)));
+      Object.assign(base, { nMed, date: tLast + nMed * sec, dLo: tLast + Math.max(1, Math.round(q(comp, 0.25))) * sec, dHi: tLast + Math.max(1, Math.round(q(comp, 0.75))) * sec });
+      if (opp.length >= need) { base.back = Math.round(q(opp.map((p) => p.bars), 0.5)); base.backDate = base.date + base.back * sec; }
+    }
+    base.accPage = dateAccuracy(drv, tf, 'page');
+    if (tf === '3d' && !base.near) {
+      const rows = stateRows(drv, tf, true), cur = rows[rows.length - 1];
+      const accK = dateAccuracy(drv, tf, 'knn');
+      if (cur && cur.i === n - 1 && accK && base.accPage && accK.within > base.accPage.within && accK.miss <= base.accPage.miss) {
+        const kp = knnPredict(rows, cur);
+        if (kp) {
+          Object.assign(base, { method: 'cascade', accK, nMed: kp.mid, date: tLast + kp.mid * sec, dLo: tLast + kp.lo * sec, dHi: tLast + kp.hi * sec });
+          if (opp.length >= need) base.backDate = base.date + base.back * sec;
+        }
+      }
+    }
+
+    // BTC behaviour in past swings
+    const B = series('B', tf); const bIdx = new Map(); if (B) B.t.forEach((t, i) => bIdx.set(t, i));
+    const bR = B ? rsiSeries(B.c).r : [];
+    const expect = (last.type === 'L' ? 1 : -1) * RISK[drv];
+    let hits = 0, nb = 0; const endRsi = [], lows = [], highs = [];
+    for (const p of same) {
+      const i0 = bIdx.get(D.t[p.from]), i1 = bIdx.get(D.t[p.to]); if (i0 == null || i1 == null) continue;
+      nb++; if (Math.sign(B.c[i1] - B.c[i0]) === expect) hits++;
+      if (bR[i1] != null) endRsi.push(bR[i1]);
+      const seg = B.c.slice(i0, i1 + 1); lows.push(Math.min(...seg) / B.c[i0] - 1); highs.push(Math.max(...seg) / B.c[i0] - 1);
+    }
+    base.btc = nb >= need ? { hit: hits / nb, n: nb, expect, endRsi: q(endRsi, 0.5), low: q(lows, 0.5), high: q(highs, 0.5) } : { n: nb };
+
+    // levels at the target close; the method depends on timeframe, driver and how far the swing has run (RULES)
+    const tStart = D.t[last.i]; const vals = {};
+    const mdur = q(same.map((p) => p.bars), 0.5) || 1;
+    const stage = elapsed === 0 ? 0 : elapsed < 0.5 * mdur ? 1 : 2;
+    const rule = RULES[tf] && RULES[tf][drv] ? RULES[tf][drv][stage] : 'B';
+    Object.assign(base, { stage, rule, halfAt: Math.max(0, Math.ceil(0.5 * mdur) - elapsed) });
+    for (const k of KEYS) {
+      const X = series(k, tf); if (!X || !X.c.length) { vals[k] = null; continue; }
+      const v = { now: X.c[X.c.length - 1], driver: k === drv };
+      const moves = same.map((p) => { const a = maps[k].get(D.t[p.from]), b = maps[k].get(D.t[p.to]); return a && b ? b / a - 1 : null; }).filter((x) => x != null);
+      const anchor = maps[k].get(tStart);
+      v.n = moves.length;
+      if (anchor == null) v.why = `${NAME[k]} has no data at the start of this swing`;
+      else if (moves.length < MIN_LOW) v.why = `only ${moves.length} past swing${moves.length === 1 ? '' : 's'} with ${NAME[k]} data`;
+      else {
+        const med = q(moves, 0.5);
+        const want = (target === Z.hi ? 1 : -1) * RISK[drv] * RISK[k];
+        if (k === 'B' && drv !== 'B' && base.btc.hit != null && base.btc.hit < MIN_HIT) v.why = `BTC moved the expected way in only ${Math.round(base.btc.hit * 100)}% of past swings, so there is no reliable BTC level`;
+        else if (k !== drv && moves.filter((m) => Math.sign(m) === want).length / moves.length < MIN_HIT) v.why = `${NAME[k]} moved the expected way in only ${Math.round(100 * moves.filter((m) => Math.sign(m) === want).length / moves.length)}% of past swings`;
+        else if (rule === null) v.why = `at this stage of a ${TF[tf].label.toLowerCase()} ${NAME[drv]} swing, no method beat "no change" in the backtest. A level appears once the swing has run half its typical length${base.halfAt ? `, about ${base.halfAt} more candle${base.halfAt === 1 ? '' : 's'}` : ''}`;
+        else if (rule === 'D') {
+          const nowK = maps[k].get(tLast);
+          const cand = same.filter((p) => p.bars > elapsed).map((p) => {
+            const a = maps[k].get(D.t[p.from]), m = maps[k].get(D.t[p.from + elapsed]), b = maps[k].get(D.t[p.to]);
+            return a && m && b ? { ms: Math.log(m / a), rem: Math.log(b / m) } : null;
+          }).filter(Boolean);
+          if (nowK == null || cand.length < 5) v.why = `only ${cand.length} past swing${cand.length === 1 ? '' : 's'} ran as long as this one, too few to update the level for the move so far`;
+          else {
+            const ms = Math.log(nowK / anchor);
+            const nb = cand.sort((x, y) => Math.abs(x.ms - ms) - Math.abs(y.ms - ms)).slice(0, KNN[tf][drv]);
+            const rem = nb.map((x) => x.rem);
+            v.method = 'D'; v.nb = nb.length; v.low = moves.length < MIN_SWINGS; v.base = nowK;
+            v.mid = nowK * Math.exp(q(rem, 0.5)); v.lo = nowK * Math.exp(q(rem, 0.25)); v.hi = nowK * Math.exp(q(rem, 0.75));
+            v.against = Math.sign(v.mid - nowK) !== want; v.want = want;
+          }
+        }
+        else if (Math.sign(med) !== want) v.why = `past swings don't agree on direction (median move ${pct(med)})`;
+        else {
+          v.method = 'B'; v.low = moves.length < MIN_SWINGS;
+          v.mid = anchor * (1 + med); v.lo = anchor * (1 + q(moves, 0.25)); v.hi = anchor * (1 + q(moves, 0.75));
+          v.passed = want > 0 ? v.now >= v.mid : v.now <= v.mid;
+        }
+      }
+      vals[k] = v;
+    }
+    base.vals = vals;
+    const BX = series('B', tf); const rg = drv !== 'B' && BX ? regress(BX, D) : null; base.corr = rg ? rg.r : null;
+    return base;
+  }
+
+  /* ---- formatting ---- */
+  const fmtV = (k, v) => v == null || !isFinite(v) ? '—' : k === 'B' ? '$' + Math.round(v).toLocaleString('en-US') : (k === 'E' || k === 'X' || k === 'S') ? (Math.abs(v) >= 1e12 ? '$' + (v / 1e12).toFixed(3) + 'T' : '$' + (v / 1e9).toFixed(1) + 'B') : v.toFixed(3) + '%';
+  const pct = (v) => v == null || !isFinite(v) ? '—' : (v >= 0 ? '+' : '') + (v * 100).toFixed(1) + '%';
+  const fd = (t, tf) => { const d = new Date(t * 1000); return tf === '4h' || tf === '8h' ? d.toLocaleString([], { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }); };
+  const zone = (v, tf) => { if (v == null) return ''; const Z = ZN(tf); return v <= Z.lo ? 'os' : v >= Z.hi ? 'ob' : ''; };
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  function spark(p, z) {
+    const W = 320, H = 92, L = 22, R = 6, T = 6, Bm = 14; const Z = ZN(p.tf);
+    const hist = p.r.slice(-90).filter((v) => v != null);
+    const fut = z ? Math.min(z.w1 + (z.w2 || 0), 60) : p.date && !p.near ? Math.min(p.nMed, 45) : 0;
+    const tot = hist.length - 1 + fut;
+    const x = (i) => L + (W - L - R) * (i / Math.max(1, tot)), y = (v) => T + (H - T - Bm) * (1 - v / 100);
+    const pts = hist.map((v, i) => x(i).toFixed(1) + ',' + y(v).toFixed(1)).join(' ');
+    const xe = x(hist.length - 1), ye = y(hist[hist.length - 1]);
+    let proj = '';
+    if (z) { const x1 = x(hist.length - 1 + Math.min(z.w1, fut)), y1 = y(z.t1); proj = `<polyline points="${xe.toFixed(1)},${ye.toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}${z.w2 ? ' ' + x(tot).toFixed(1) + ',' + y(z.t2).toFixed(1) : ''}" fill="none" stroke="var(--warn)" stroke-width="1.5" stroke-dasharray="4 3"/><circle cx="${x1.toFixed(1)}" cy="${y1.toFixed(1)}" r="3" fill="var(--panel)" stroke="var(--warn)" stroke-width="1.5"/>${z.w2 ? `<circle cx="${x(tot).toFixed(1)}" cy="${y(z.t2).toFixed(1)}" r="3" fill="var(--panel)" stroke="var(--warn)" stroke-width="1.5"/>` : ''}`; }
+    else if (p.date && !p.near) proj = `<line x1="${xe.toFixed(1)}" y1="${ye.toFixed(1)}" x2="${x(tot).toFixed(1)}" y2="${y(p.target).toFixed(1)}" stroke="var(--acc)" stroke-width="1.5" stroke-dasharray="4 3"/><circle cx="${x(tot).toFixed(1)}" cy="${y(p.target).toFixed(1)}" r="3" fill="var(--panel)" stroke="var(--acc)" stroke-width="1.5"/>`;
+    return `<svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="RSI 7 history, last 90 candles${p.none ? '' : ', with projected path'}">
+      <rect x="${L}" y="${y(Z.hi)}" width="${W - L - R}" height="${y(Z.lo) - y(Z.hi)}" fill="var(--soft)"/>
+      <line x1="${L}" x2="${W - R}" y1="${y(Z.hi)}" y2="${y(Z.hi)}" stroke="var(--warn)" stroke-width="1" stroke-dasharray="2 3"/>
+      <line x1="${L}" x2="${W - R}" y1="${y(Z.lo)}" y2="${y(Z.lo)}" stroke="var(--acc)" stroke-width="1" stroke-dasharray="2 3"/>
+      <text x="2" y="${y(Z.hi) + 3}">${Z.hi}</text><text x="2" y="${y(Z.lo) + 3}">${Z.lo}</text>
+      <polyline points="${pts}" fill="none" stroke="var(--ink)" stroke-width="1.4" stroke-linejoin="round"/>
+      ${proj}
+      <circle cx="${xe.toFixed(1)}" cy="${ye.toFixed(1)}" r="3" fill="var(--ink)"/>
+      <text x="${L}" y="${H - 2}">${hist.length} candles ago</text><text x="${xe.toFixed(1)}" y="${H - 2}" text-anchor="${fut > 15 ? 'middle' : 'end'}">now</text>
+    </svg>`;
+  }
+
+  let CACHE = {};
+  /* ---- forecast history: one entry per card per closed candle, kept in the page's database ---- */
+  let LOG = {};
+  const r1 = (v) => v == null || !isFinite(v) ? null : Math.round(v * 10) / 10;
+  const rv = (v) => v == null || !isFinite(v) ? null : Math.abs(v) < 100 ? Math.round(v * 1e5) / 1e5 : Math.round(v * 100) / 100;
+  function snapshotOf(drv, tf) {
+    const p = proj(drv, tf); if (!p || p.none || !p.last) return null;
+    const e = { c: p.D.t[p.D.t.length - 1], rsi: r1(p.now), tgt: p.target, trig: rv(p.trigger), el: p.elapsed };
+    if (conflict(tf)) e.st = 'conflict';
+    else if (p.near) e.st = 'near';
+    else if (!p.thin && p.date) Object.assign(e, { st: 'date', d: p.date, lo: p.dLo, hi: p.dHi });
+    else if (tf === '1w' && !CORE.includes(drv)) { const W = weekly(tf), z = W.cf ? null : tentative(drv, tf); if (z && z.d1) Object.assign(e, { st: 'tent', d: z.d1, lo: z.d1lo, hi: z.d1hi }); else e.st = 'lacks'; }
+    else if (tf === '1w') { const W = weekly(tf); if (!W.cf && !W.none && W.d1) Object.assign(e, { st: 'tent', d: W.d1, lo: W.s1[0], hi: W.s1[1] }); else e.st = 'lacks'; }
+    else e.st = 'lacks';
+    return e;
+  }
+  function forecasts() { const out = []; for (const tf of Object.keys(TF)) for (const k of SHOW) { const e = snapshotOf(k, tf); if (e) out.push({ key: k + '_' + tf, e }); } return out; }
+  function logBlock(drv, tf) {
+    const rows = (LOG[drv + '_' + tf] || []).slice().reverse(); if (!rows.length) return '';
+    const sec = TF[tf].sec;
+    const lbl = { date: '', tent: ' (tentative)', near: 'Within reach', conflict: 'Signals conflict', lacks: 'Lacks confirmation' };
+    const body = rows.slice(0, 30).map((e, i) => {
+      const prev = rows[i + 1];
+      let sh = '—', cls = '';
+      if (prev && prev.tgt !== e.tgt) { sh = 'Swing flipped'; cls = 'flip'; }
+      else if (prev && prev.d && e.d) { const dd = Math.round((e.d - prev.d) / sec); sh = dd > 0 ? `${dd} later` : dd < 0 ? `${-dd} earlier` : 'unchanged'; cls = dd > 0 ? 'later' : dd < 0 ? 'earlier' : ''; }
+      const exp = e.d ? fd(e.d, tf) + lbl[e.st] : lbl[e.st];
+      return `<tr><td>${fd(e.c, tf)}</td><td>${e.rsi != null ? e.rsi.toFixed(1) : '—'}</td><td>${e.tgt}</td><td class="st">${exp}</td><td>${e.lo && e.hi ? fd(e.lo, tf) + ' – ' + fd(e.hi, tf) : '—'}</td><td>${fmtV(drv, e.trig)}</td><td class="${cls}">${sh}</td></tr>`;
+    }).join('');
+    const unit = tf === '1d' ? 'days' : tf === '1w' ? 'weeks' : 'candles';
+    return `<details><summary>Forecast history (${rows.length} candle${rows.length === 1 ? '' : 's'})</summary><div class="scroll"><table class="ep"><thead><tr><th>Candle</th><th>RSI</th><th>Next</th><th>Expected</th><th>Range</th><th>Trigger</th><th>Shift (${unit})</th></tr></thead><tbody>${body}</tbody></table></div>${rows.length > 30 ? '<p class="foot">Showing the latest 30.</p>' : ''}</details>`;
+  }
+  const proj = (k, tf) => (k + tf) in CACHE ? CACHE[k + tf] : (CACHE[k + tf] = project(k, tf));
+  function conflict(tf) { // do the tickers' current swings imply opposite BTC directions?
+    const up = [], dn = [];
+    for (const k of CORE) { const p = proj(k, tf); if (!p || p.none || !p.last) continue; ((p.last.type === 'L' ? 1 : -1) * RISK[k] > 0 ? up : dn).push(NAME[k]); }
+    return up.length && dn.length ? { up, dn } : null;
+  }
+  /* ---- weekly tentative forecast: always shown on 1W, built from whatever swings exist ----
+     Small samples by design. Leg 1 = next RSI extreme, leg 2 = the opposite extreme after it.
+     Timing: this ticker's own past swings when it has at least 2, otherwise swings pooled from all
+     all tickers' weekly RSI(7); if no past swing is longer than the current one, RSI momentum
+     (median weekly RSI change over the last 26 closed weeks) sets the remaining distance. */
+  const TENT_MIN = 2;
+  function legsOf(k, tf) {
+    const F = series(k, tf); if (!F || F.c.length < 31) return null;
+    const D = closedOnly(F, tf); const r = rsiSeries(D.c).r; const ex = extremes(r, tf);
+    const pairs = [];
+    for (let i = 0; i + 1 < ex.length; i++) pairs.push({ type: ex[i].type, bars: ex[i + 1].i - ex[i].i, t0: D.t[ex[i].i], t1: D.t[ex[i + 1].i] });
+    return { D, r, ex, pairs };
+  }
+  function tentative(drv, tf) {
+    const p = proj(drv, tf); if (!p || p.none || !p.last) return null;
+    const sec = TF[tf].sec, D = p.D, n = D.c.length, tLast = D.t[n - 1]; const Z = ZN(tf);
+    const own = legsOf(drv, tf).pairs;
+    const pool = []; for (const k of CORE) { const L = legsOf(k, tf); if (L) pool.push(...L.pairs); }
+    const typ1 = p.last.type, typ2 = typ1 === 'L' ? 'H' : 'L';
+    const iqr = (a) => [Math.max(1, Math.round(q(a, 0.25))), Math.max(1, Math.round(q(a, 0.75)))];
+    // momentum: typical weekly RSI change
+    const dr = []; for (let i = Math.max(P + 1, n - 26); i < n; i++) if (p.r[i] != null && p.r[i - 1] != null) dr.push(Math.abs(p.r[i] - p.r[i - 1]));
+    const vel = Math.max(3, q(dr, 0.5) || 8);
+    // leg 1
+    let w1, r1, src1, n1s;
+    if (p.near) { w1 = 1; r1 = [1, 2]; src1 = 'within 5 RSI points of ' + p.target; n1s = 0; }
+    else {
+      const ownRem = own.filter((x) => x.type === typ1 && x.bars > p.elapsed).map((x) => x.bars - p.elapsed);
+      const poolRem = pool.filter((x) => x.type === typ1 && x.bars > p.elapsed).map((x) => x.bars - p.elapsed);
+      const mom = Math.max(1, Math.ceil(Math.abs(p.target - p.now) / vel));
+      if (ownRem.length >= TENT_MIN) { const h = q(ownRem, 0.5); w1 = Math.max(1, Math.round((h + mom) / 2)); r1 = iqr(ownRem); src1 = `${ownRem.length} of this ticker's own past swings that ran longer, blended with RSI momentum`; n1s = ownRem.length; }
+      else if (poolRem.length >= TENT_MIN) { const h = q(poolRem, 0.5); w1 = Math.max(1, Math.round((h + mom) / 2)); r1 = iqr(poolRem); src1 = `${poolRem.length} longer swings pooled from all tickers, blended with RSI momentum`; n1s = poolRem.length; }
+      else { w1 = mom; r1 = [Math.max(1, Math.round(mom * 0.6)), Math.round(mom * 1.8) + 1]; src1 = `RSI momentum only (typical weekly change ${vel.toFixed(1)} points); no past swing ran this long`; n1s = 0; }
+      r1 = [Math.min(r1[0], w1), Math.max(r1[1], w1)];
+    }
+    // leg 2
+    const own2 = own.filter((x) => x.type === typ2).map((x) => x.bars), pool2 = pool.filter((x) => x.type === typ2).map((x) => x.bars);
+    const s2 = own2.length >= TENT_MIN ? own2 : pool2;
+    const w2 = s2.length ? Math.max(1, Math.round(q(s2, 0.5))) : null, r2 = s2.length ? iqr(s2) : null;
+    const src2 = own2.length >= TENT_MIN ? `${own2.length} of this ticker's own ${typ2 === 'L' ? Z.lo + ' → ' + Z.hi : Z.hi + ' → ' + Z.lo} swings` : `${pool2.length} swings pooled from all tickers`;
+    const d1 = tLast + w1 * sec, d2 = w2 ? d1 + w2 * sec : null;
+    // values: median move of each ticker across the driver's own legs of that type (needs 2+)
+    const maps = {}; for (const k of KEYS) { const X = series(k, tf); const m = new Map(); if (X) X.t.forEach((t, i) => m.set(t, X.c[i])); maps[k] = m; }
+    // legs over a year are regime outliers (RSI never reached the other side), so values use shorter legs when 2+ exist
+    const legsFor = (type) => { const a = own.filter((x) => x.type === type), s = a.filter((x) => x.bars <= 52); return s.length >= TENT_MIN ? s : a; };
+    const mv = (k, type) => legsFor(type).map((x) => { const a = maps[k].get(x.t0), b = maps[k].get(x.t1); return a && b ? (k === 'U' ? b - a : b / a - 1) : null; }).filter((x) => x != null);
+    const want = (tgt, k) => (tgt === Z.hi ? 1 : -1) * RISK[drv] * RISK[k];
+    let hidden = 0;
+    const vals = KEYS.map((k) => {
+      const anchor = maps[k].get(p.startT), X = series(k, tf); if (!X) return null;
+      const now = X.c[X.c.length - 1], m1 = mv(k, typ1), m2 = mv(k, typ2);
+      const md1 = m1.length >= TENT_MIN ? q(m1, 0.5) : null, md2 = m2.length >= TENT_MIN ? q(m2, 0.5) : null;
+      const ap = (base, m) => k === 'U' ? base + m : base * (1 + m);
+      let v1 = anchor != null && md1 != null ? ap(anchor, md1) : null;
+      if (v1 != null && Math.sign(md1) !== want(p.target, k)) { v1 = null; hidden++; }
+      let v2 = v1 != null && md2 != null ? ap(v1, md2) : null;
+      if (v2 != null && Math.sign(md2) !== want(typ1 === 'L' ? Z.lo : Z.hi, k)) { v2 = null; hidden++; }
+      return { k, now, v1, v2, n1: m1.length, n2: m2.length };
+    }).filter(Boolean);
+    const lv = (t) => t === 'L' ? Z.lo : Z.hi;
+    return { w1, r1, d1, d1lo: tLast + r1[0] * sec, d1hi: tLast + r1[1] * sec, src1, n1s, t1: p.target,
+      w2, d2, d2lo: w2 ? d1 + r2[0] * sec : null, d2hi: w2 ? d1 + r2[1] * sec : null, src2, n2s: s2.length, t2: lv(typ1),
+      ownN: own.length, poolN: pool.length, vals, vel, hidden };
+  }
+  /* One weekly forecast shared by every tab. Each ticker's tentative estimate forecasts the same
+     event (step 1 = the next BTC low or high leg, step 2 = the turn after it), so the box shows the
+     median of the tickers' estimates on all tabs instead of different answers. When the tickers
+     point BTC in opposite directions the box is withheld. */
+  let WCACHE = null;
+  function weekly(tf) {
+    if (WCACHE) return WCACHE;
+    const cf = conflict(tf); if (cf) return (WCACHE = { cf });
+    const zs = {}; for (const k of CORE) { const z = tentative(k, tf); if (z) zs[k] = z; }
+    const ks = Object.keys(zs); if (!ks.length) return (WCACHE = { none: true });
+    const sec = TF[tf].sec, ref = zs[ks[0]].d1;
+    const snap = (t) => ref + Math.round((t - ref) / sec) * sec;
+    const est = (sel) => ks.filter((k) => zs[k][sel] != null).map((k) => ({ k, t: zs[k][sel] }));
+    const e1 = est('d1'), e2 = est('d2');
+    const mid = (e) => e.length ? snap(q(e.map((x) => x.t), 0.5)) : null;
+    const d1 = mid(e1), d2 = mid(e2);
+    const span = (e) => e.length ? [Math.min(...e.map((x) => x.t)), Math.max(...e.map((x) => x.t))] : null;
+    const vals = KEYS.map((k) => {
+      const pick = (sel) => ks.map((d) => (zs[d].vals.find((v) => v.k === k) || {})[sel]).filter((x) => x != null);
+      const a1 = pick('v1'), a2 = pick('v2'), nowA = pick('now');
+      if (!nowA.length) return null;
+      return { k, now: nowA[0], v1: a1.length ? q(a1, 0.5) : null, v2: a2.length ? q(a2, 0.5) : null, n1: a1.length, n2: a2.length };
+    }).filter(Boolean);
+    const level = (k, step) => { const z = zs[k]; return z ? (step === 1 ? z.t1 : z.t2) : null; };
+    return (WCACHE = { e1, e2, d1, d2, s1: span(e1), s2: span(e2), vals, level, zs, ks });
+  }
+  /* Own weekly estimate for a ticker outside CORE (not used while only USDT.D + USDC.D is shown). */
+  function ownTentBlock(drv, tf) {
+    const W = weekly(tf);
+    if (W.cf) return `<div class="lowconf"><b>Weekly forecast lacks confirmation.</b> ${W.cf.up.join(' and ')} point${W.cf.up.length > 1 ? '' : 's'} to BTC rising, ${W.cf.dn.join(' and ')} point${W.cf.dn.length > 1 ? '' : 's'} to BTC falling, so no weekly date or levels until they agree. The exact RSI trigger above still holds.</div>`;
+    const z = tentative(drv, tf); if (!z || !z.d1) return '';
+    const wk = (a, b) => Math.round((b - a) / TF[tf].sec);
+    const row = (v, val, base, baseLbl) => val == null ? '' : `<div class="tk-top"><span class="n">${NAME[v.k]}</span><span class="r">${fmtV(v.k, val)} <span class="${val >= base ? 'pos' : 'neg'}">${pct(val / base - 1)}</span> <span class="tk-sub">${baseLbl}</span></span></div>`;
+    const v1 = z.vals.map((v) => row(v, v.v1, v.now, 'vs now')).join('');
+    const v2 = z.vals.map((v) => v.v1 != null ? row(v, v.v2, v.v1, 'vs step 1') : row(v, v.v2, v.now, 'vs now')).join('');
+    return `<div class="tent">
+      <div class="lbl">Tentative weekly forecast · limited data · ${esc(NAME[drv])} only</div>
+      <div class="leg"><div class="leg-h">1 · ${esc(NAME[drv])} RSI(7) ${z.t1} around</div><div class="big num">${fd(z.d1, tf)}</div>
+        <div class="rng num">Window ${fd(z.d1lo, tf)} – ${fd(z.d1hi, tf)} · from ${esc(z.src1)}.</div>${v1 ? `<div class="vals2 tv">${v1}</div>` : ''}</div>
+      ${z.d2 ? `<div class="leg"><div class="leg-h">2 · then ${esc(NAME[drv])} RSI(7) ${z.t2} around</div><div class="big num">${fd(z.d2, tf)}</div>
+        <div class="rng num">Window ${fd(z.d2lo, tf)} – ${fd(z.d2hi, tf)} · about ${wk(z.d1, z.d2)} weeks after step 1 · from ${esc(z.src2)}.</div>${v2 ? `<div class="vals2 tv">${v2}</div>` : ''}</div>` : ''}
+      <p class="foot">${esc(NAME[drv])}'s own estimate from its ${z.ownN} completed weekly swings (pooled swings of the other tickers fill in where it has fewer than 2). It is not part of the shared weekly forecast on the other tabs. Values are each ticker's median move across ${esc(NAME[drv])}'s own past swings. A rough guide, not a confirmed signal.</p>
+    </div>`;
+  }
+  function tentBlock(drv, tf) {
+    if (tf !== '1w') return '';
+    if (!CORE.includes(drv)) return ownTentBlock(drv, tf);
+    const W = weekly(tf);
+    if (W.cf) return `<div class="lowconf"><b>Weekly forecast lacks confirmation.</b> ${W.cf.up.join(' and ')} point${W.cf.up.length > 1 ? '' : 's'} to BTC rising, ${W.cf.dn.join(' and ')} point${W.cf.dn.length > 1 ? '' : 's'} to BTC falling, so no weekly date or levels until they agree. The exact RSI trigger above still holds.</div>`;
+    if (W.none || !W.d1) return '';
+    const wk = (a, b) => Math.round((b - a) / TF[tf].sec);
+    const lvls = (step) => W.ks.map((k) => `${NAME[k]} RSI ${W.level(k, step)}`).join(', ');
+    const ests = (e) => e.map((x) => `${NAME[x.k]} ${fd(x.t, tf)}`).join(' · ');
+    const spreadNote = (s) => { const w = wk(s[0], s[1]); return w > 8 ? ` <span class="lowtag">The tickers disagree on timing by ${w} weeks, so treat this as a window, not a date.</span>` : ''; };
+    const row = (v, val, base, baseLbl) => val == null ? '' : `<div class="tk-top"><span class="n">${NAME[v.k]}</span><span class="r">${fmtV(v.k, val)} <span class="${val >= base ? 'pos' : 'neg'}">${pct(val / base - 1)}</span> <span class="tk-sub">${baseLbl}</span></span></div>`;
+    const v1 = W.vals.map((v) => row(v, v.v1, v.now, 'vs now')).join('');
+    const v2 = W.vals.map((v) => v.v1 != null ? row(v, v.v2, v.v1, 'vs step 1') : row(v, v.v2, v.now, 'vs now')).join('');
+    const own1 = W.level(drv, 1), own2 = W.level(drv, 2);
+    return `<div class="tent">
+      <div class="lbl">Tentative weekly forecast · limited data</div>
+      <div class="leg"><div class="leg-h">1 · ${esc(NAME[drv])} RSI(7) ${own1} around</div><div class="big num">${fd(W.d1, tf)}</div>
+        <div class="rng num">Window ${fd(W.s1[0], tf)} – ${fd(W.s1[1], tf)} · from past weekly USDT.D + USDC.D swings blended with RSI momentum.</div>${v1 ? `<div class="vals2 tv">${v1}</div>` : ''}</div>
+      ${W.d2 ? `<div class="leg"><div class="leg-h">2 · then ${esc(NAME[drv])} RSI(7) ${own2} around</div><div class="big num">${fd(W.d2, tf)}</div>
+        <div class="rng num">Window ${fd(W.s2[0], tf)} – ${fd(W.s2[1], tf)} · about ${wk(W.d1, W.d2)} weeks after step 1 · from the typical length of past opposite swings.</div>${v2 ? `<div class="vals2 tv">${v2}</div>` : ''}</div>` : ''}
+      <p class="foot">Values are BTC's median move across past weekly USDT.D + USDC.D swings. Step 1 values are compared with now; step 2 values are compared with step 1, because step 2 is a move from there. Built from small weekly samples, so it is a rough guide, not a confirmed signal. Every refresh recalculates it with the newest weekly close.</p>
+    </div>`;
+  }
+  function weeklySpark(p, tf) {
+    if (tf !== '1w') return null;
+    if (!CORE.includes(p.drv)) { const W0 = weekly(tf); if (W0.cf) return null; const z = tentative(p.drv, tf); return z && z.d1 ? { w1: z.w1, w2: z.w2, t1: z.t1, t2: z.t2 } : null; }
+    const W = weekly(tf); if (W.cf || W.none || !W.d1) return null;
+    const sec = TF[tf].sec, tLast = p.D.t[p.D.t.length - 1];
+    const w1 = Math.max(1, Math.round((W.d1 - tLast) / sec));
+    const w2 = W.d2 ? Math.max(1, Math.round((W.d2 - W.d1) / sec)) : null;
+    const Z = ZN(tf); return { w1, w2, t1: p.target, t2: p.target === Z.hi ? Z.lo : Z.hi };
+  }
+
+  function accLine(p, T) {
+    const a = p.method === 'cascade' ? p.accK : p.accPage; if (!a) return '';
+    const other = p.method === 'cascade' && p.accPage ? ` The usual swing-length method scored ${Math.round(p.accPage.within * 100)}% (miss ${Math.round(p.accPage.miss)}), so this card uses the ${TF[CAS[p.tf]].short}-adjusted date.` : '';
+    return `<div class="rng">Past accuracy: this date method landed within 25% of the actual wait in <b>${Math.round(a.within * 100)}%</b> of ${a.n} past ${T.short} forecasts; typical miss ${Math.round(a.miss)} candle${Math.round(a.miss) === 1 ? '' : 's'}. Use the range, not the single date.${other}</div>`;
+  }
+  function cascadeBlock(drv, tf) {
+    const c = cascade(drv, tf); if (!c || !c.now) return '';
+    const T = TF[tf], LT = TF[c.lt], Z = ZN(tf), ZL = ZN(c.lt), st = c.stats[c.now.tgt];
+    const lvl = c.now.tgt === 'H' ? Z.hi : Z.lo, llvl = c.now.tgt === 'H' ? ZL.hi : ZL.lo;
+    const pc = (x) => x == null ? '—' : Math.round(x * 100) + '%';
+    const rates = st.n >= CAS_MIN ? `In past ${T.short} swings, after the ${LT.short} first closed at ${llvl}, the ${T.short} closed at ${lvl} within 3 candles <b>${pc(st.p3)}</b> and within 6 candles <b>${pc(st.p6)}</b> of the time (normally ${pc(st.b3)} and ${pc(st.b6)}; ${st.n} past cases).`
+      : `Only ${st.n} past cases of the ${LT.short} leading into a ${T.short} ${lvl}, too few for odds.`;
+    const firstLine = c.tot ? ` The ${LT.short} got there first in ${c.first} of ${c.tot} completed ${T.short} swings.` : '';
+    if (c.now.touched) {
+      const faded = c.now.ago > 6 ? ` That was ${c.now.ago} ${T.short} candles ago, past the 6-candle window, so the warning has faded.` : ` That was ${c.now.ago} ${T.short} candle${c.now.ago === 1 ? '' : 's'} ago.`;
+      return `<div class="divline ${c.now.ago > 6 ? '' : 'fm'}"><b>Early warning from the ${LT.short}:</b> the ${LT.short} RSI(7) closed at ${llvl} on the ${fd(c.now.at, c.lt)} candle while the ${T.short} heads for ${lvl}.${faded} ${rates}</div>`;
+    }
+    return `<div class="divline"><b>No early warning yet:</b> the ${LT.short} RSI(7) has not closed at ${llvl} since this ${T.short} swing began (now ${c.now.rL != null ? c.now.rL.toFixed(1) : '—'}).${firstLine} ${rates}</div>`;
+  }
+  function card(drv, tf) {
+    const p = proj(drv, tf); const T = TF[tf]; const cf = conflict(tf); const Z = ZN(tf);
+    if (!p) return `<article class="card"><div class="card-head"><h3>${T.label}</h3></div><p class="state">Lacks confirmation: fewer than 31 closed ${T.short} candles in the snapshot.</p></article>`;
+    const head = `<div class="card-head"><h3>${T.label} · RSI(7)</h3><span><span class="rsi-pill ${zone(p.now, tf)}" title="RSI at the last closed candle">${p.now.toFixed(1)} closed</span>${p.formingRsi != null ? ` <span class="live" title="Forming candle, as of the last refresh">forming ${p.formingRsi.toFixed(1)}</span>` : ''}</span></div>`;
+    if (p.none) return `<article class="card">${head}${divLine(drv, tf)}<p class="state">Lacks confirmation: RSI has not closed at ${Z.lo} or ${Z.hi} since ${fd(p.firstT, tf)}.</p>${spark(p)}</article>`;
+    const lvl = String(p.last.type === 'L' ? Z.lo : Z.hi), dir = `${lvl} → ${p.target}`;
+    const inZone = (p.last.type === 'L' && p.now <= Z.lo) || (p.last.type === 'H' && p.now >= Z.hi);
+    const zt = p.last.type === 'L' ? 'at or below ' + Z.lo : 'at or above ' + Z.hi;
+    const ago = `${p.elapsed} candle${p.elapsed === 1 ? '' : 's'} ago`;
+    const state = inZone && p.cont
+      ? `Closed ${zt} on every candle since the ${fd(p.startT, tf)} candle (${ago}). Next: a close at ${p.target}.`
+      : inZone
+      ? `This swing started when RSI first closed ${zt} on the ${fd(p.startT, tf)} candle (${ago}). It moved back to ${p.away.toFixed(1)} in between, then closed ${zt} again on the latest candle. Next: a close at ${p.target}.`
+      : `This swing started when RSI first closed at ${lvl} on the ${fd(p.startT, tf)} candle (${ago})${p.lastTouchT !== p.startT ? `; it last closed ${zt} on the ${fd(p.lastTouchT, tf)} candle` : ''}. Next: a close at ${p.target}.`;
+    const hist = p.hist && p.hist.length ? `<details><summary>Past ${dir} swings (${p.count} total)</summary><div class="scroll"><table class="ep"><thead><tr><th>Closed at ${lvl}</th><th>Closed at ${p.target}</th><th>Candles</th><th>${esc(NAME[drv])}</th>${drv === 'B' ? '' : '<th>BTC</th>'}</tr></thead><tbody>${p.hist.map((h) => `<tr><td>${fd(h.from, tf)}</td><td>${fd(h.to, tf)}</td><td>${h.bars}</td><td class="${h.dMove >= 0 ? 'pos' : 'neg'}">${pct(h.dMove)}</td>${drv === 'B' ? '' : `<td class="${h.bMove == null ? '' : h.bMove >= 0 ? 'pos' : 'neg'}">${pct(h.bMove)}</td>`}</tr>`).join('')}</tbody></table></div></details>` : '';
+    if (p.thin) {
+      return `<article class="card">${head}${divLine(drv, tf)}<p class="state">${state}</p>${cascadeBlock(drv, tf)}
+        <div class="target"><div class="lbl">Lacks confirmation</div><p class="next">${p.count ? 'Only ' + p.count : 'No'} completed ${dir} swing${p.count === 1 ? '' : 's'} since ${fd(p.firstT, tf)}; at least ${MIN_LOW} are needed before the page gives a date, levels or BTC behaviour.</p></div>
+        <p class="next">A ${T.short} close ${p.target === Z.hi ? 'at or above' : 'at or below'} <b>${fmtV(drv, p.trigger)}</b> on the ${fd(p.nextT, tf)} candle puts RSI(7) at ${p.target}. This is exact RSI maths and doesn't need history.</p>
+        ${tentBlock(drv, tf)}${spark(p, weeklySpark(p, tf))}${logBlock(drv, tf)}${hist}${p.histN ? `<p class="foot">History: DefiLlama total stablecoin supply ${fd(p.D.t[0], tf)} – ${fd(p.D.t[p.histN - 1], tf)} (scaled to TradingView's level), then CRYPTOCAP:STABLE.C from ${fd(p.D.t[p.histN], tf)}.</p>` : ''}</article>`;
+    }
+    const trig = `A ${T.short} close ${p.target === Z.hi ? 'at or above' : 'at or below'} <b>${fmtV(drv, p.trigger)}</b> on the ${fd(p.nextT, tf)} candle puts ${esc(NAME[drv])} RSI(7) at ${p.target}.`;
+    const dateBlock = p.near
+      ? `<div class="big num">Within reach</div><div class="rng">Closed RSI ${p.now.toFixed(1)} is ${Math.abs(p.target - p.now).toFixed(1)} points from ${p.target}. ${trig} The history-based date doesn't apply this close to the level.</div>`
+      : p.date
+      ? `<div class="big num">${fd(p.date, tf)}</div><div class="rng num">Range ${fd(p.dLo, tf)} – ${fd(p.dHi, tf)} · about ${p.nMed} candle${p.nMed === 1 ? '' : 's'} after the last closed candle · ${p.method === 'cascade' ? `from the 15 most similar past ${T.short} moments, including the ${TF[CAS[tf]].short} RSI` : `from ${p.comparable} comparable swings`}</div>${accLine(p, T)}`
+      : `<div class="big num">Lacks confirmation</div><div class="rng">This swing is ${p.elapsed} candles old. Only ${p.comparable} of ${p.count} past swings lasted longer (need ${p.compNeed}), so the date lacks confirmation.</div>`;
+    const cfMsg = cf ? `Signals conflict on the ${T.short}: ${cf.up.join(' and ')} point${cf.up.length > 1 ? '' : 's'} to BTC rising, ${cf.dn.join(' and ')} point${cf.dn.length > 1 ? '' : 's'} to BTC falling.` : '';
+    const trigLine = p.near ? '' : `<p class="next">${trig}</p>`;
+    const cls = (c) => c == null ? '' : c >= 0 ? 'pos' : 'neg';
+    const rows = KEYS.map((k) => {
+      const v = p.vals[k]; if (!v) return '';
+      if (v.mid == null) return `<div class="tk"><div class="tk-top"><span class="n ${v.driver ? 'drv' : ''}">${NAME[k]}</span><span class="r">${fmtV(k, v.now)} → <b>Lacks confirmation</b></span></div><div class="tk-sub">${esc(v.why)}</div></div>`;
+      if (v.passed) return `<div class="tk">
+        <div class="tk-top"><span class="n ${v.driver ? 'drv' : ''}">${NAME[k]}</span><span class="r">${fmtV(k, v.now)} · <b>past the typical level</b></span></div>
+        <div class="tk-sub">Past swings ended at ${fmtV(k, v.mid)} typically (range ${fmtV(k, v.lo)} – ${fmtV(k, v.hi)}, ${v.n} swings${v.low && !p.low ? ', low confidence' : ''}). This swing has already moved further than usual; any further move lacks confirmation.</div>
+      </div>`;
+      const from = v.method === 'D' ? v.base : v.now, c = v.mid / from - 1;
+      return `<div class="tk">
+        <div class="tk-top"><span class="n ${v.driver ? 'drv' : ''}">${NAME[k]}</span><span class="r">${fmtV(k, from)} → <b>${fmtV(k, v.mid)}</b> <span class="${cls(c)}">${pct(c)}</span></span></div>
+        <div class="tk-sub">Range ${fmtV(k, v.lo)} – ${fmtV(k, v.hi)} · ${v.method === 'D' ? `${v.nb} past swings with a similar move so far` : `${v.n} swings`}${v.low && !p.low ? ' · <span class="lowtag">low confidence</span>' : ''}${v.against ? `<br>This swing has already moved ${v.want > 0 ? 'up' : 'down'} about as much as similar past ones did in total; those then ${v.want > 0 ? 'eased back' : 'recovered'} slightly by the ${p.target} close.` : ''}</div>
+      </div>`;
+    }).join('');
+    const bs = p.btc;
+    const btcBox = bs.hit != null ? `<div class="bstat">
+        <span class="chip ${bs.hit >= 0.65 ? 'ok' : bs.hit >= MIN_HIT ? 'warn' : 'bad'}">BTC ${bs.expect > 0 ? 'rose' : 'fell'} in ${Math.round(bs.hit * 100)}% of ${bs.n} swings</span>
+        ${drv !== 'B' && bs.endRsi != null ? `<span class="chip">BTC RSI(7) at the ${p.target} close ≈ ${Math.round(bs.endRsi)}</span>` : ''}
+        <span class="chip">BTC inside the swing ${pct(bs.low)} to ${pct(bs.high)}</span>
+      </div>` : `<div class="bstat"><span class="chip warn">BTC behaviour lacks confirmation: only ${bs.n} swings with BTC data</span></div>`;
+    const srcNote = p.histN ? `<p class="foot">History: DefiLlama total stablecoin supply ${fd(p.D.t[0], tf)} – ${fd(p.D.t[p.histN - 1], tf)} (scaled to TradingView's level), then CRYPTOCAP:STABLE.C from ${fd(p.D.t[p.histN], tf)}.</p>` : '';
+    return `<article class="card">${head}${divLine(drv, tf)}
+      <p class="state">${state}</p>
+      ${cascadeBlock(drv, tf)}
+      ${cf ? `<div class="lowconf"><b>Lacks confirmation.</b> ${cfMsg} No date, levels or BTC behaviour until they agree; the exact RSI trigger below still holds.</div>` : ''}
+      ${p.low ? `<div class="lowconf"><b>Low confidence: based on only ${p.count} past ${dir} swings.</b> Past outcomes were widely spread, so treat the date and levels as rough. Check the full range and the past swings table.</div>` : ''}
+      <div class="target"><div class="lbl">${p.near ? 'RSI ' + p.target + ' close' : 'RSI ' + p.target + ' close expected on the candle of'}</div>${cf && !p.near ? '<div class="big num">Lacks confirmation</div><div class="rng">Timeframe signals disagree.</div>' : dateBlock}</div>
+      ${trigLine}
+      ${p.date ? '' : tentBlock(drv, tf)}
+      ${cf ? '' : `<div class="vals2"><div class="h">${p.rule === 'D' ? 'Value at the last closed candle' : 'Value at last refresh'} → typical value at the ${p.target} close (${p.rule === 'D' ? `updated for the move so far: past ${dir} swings that had moved about as much by this stage` : p.rule === null ? 'no level yet at this stage of the swing' : `median of past ${dir} swings, measured from this swing's start`})${ACC[tf] && p.rule !== null && drv !== 'X' ? `. Backtest: BTC level typically within ${ACC[tf]} of the actual close.` : ''}</div>${rows}</div>
+      ${btcBox}`}
+      ${spark(p, !p.date ? weeklySpark(p, tf) : null)}
+      ${p.backDate && !p.near && !cf ? `<p class="next">Then back to ${p.target === Z.hi ? Z.lo : Z.hi}: typical ${p.back} candles, around <b>${fd(p.backDate, tf)}</b>.</p>` : ''}
+      ${logBlock(drv, tf)}
+      ${hist}
+      ${p.corr != null ? `<p class="foot">BTC vs ${esc(NAME[drv])} correlation over the last 180 candles: r ${p.corr.toFixed(2)}.</p>` : ''}
+      ${srcNote}
+    </article>`;
+  }
+
+  /* ---- RSI(7) divergence ---- */
+  const DIVCFG = { '4h': { L: 3, R: 2, gap: [4, 40], recent: 20 }, '8h': { L: 3, R: 2, gap: [4, 40], recent: 20 }, '1d': { L: 3, R: 2, gap: [4, 40], recent: 15 }, '3d': { L: 2, R: 2, gap: [3, 30], recent: 10 }, '1w': { L: 2, R: 2, gap: [3, 30], recent: 10 } };
+  function pivots(c, L, R, hi) {
+    const out = [], sg = hi ? 1 : -1;
+    for (let i = L; i < c.length - R; i++) {
+      let ok = true;
+      for (let j = i - L; j < i && ok; j++) if (sg * (c[j] - c[i]) >= 0) ok = false;
+      for (let j = i + 1; j <= i + R && ok; j++) if (sg * (c[j] - c[i]) > 0) ok = false;
+      if (ok) out.push(i);
+    }
+    return out;
+  }
+  function rsiAt(r, i, hi) { const v = [r[i - 1], r[i], r[i + 1]].filter((x) => x != null); return v.length ? (hi ? Math.max(...v) : Math.min(...v)) : null; }
+  let DCACHE = {}, ECACHE = {};
+  /* every divergence in history with its outcome: played out (RSI reached the opposite zone),
+     failed (close beyond the second peak), expired (window ended first) or open (still running) */
+  function divEvents(k, tf) {
+    const key = k + tf; if (key in ECACHE) return ECACHE[key];
+    const S0 = series(k, tf); if (!S0) return (ECACHE[key] = null);
+    const D = closedOnly(S0, tf), c = D.c, n = c.length; if (n < 40) return (ECACHE[key] = null);
+    const r = rsiSeries(c).r, cfg = DIVCFG[tf], Z = ZN(tf);
+    let bm = null; if (k !== 'B') { const bs = series('B', tf); if (bs) { bm = new Map(); bs.t.forEach((t, i) => bm.set(t, bs.c[i])); } }
+    const ev = [];
+    for (const hi of [true, false]) {
+      const sg = hi ? 1 : -1;
+      const pv = pivots(c, cfg.L, cfg.R, hi).filter((i) => r[i] != null && r[i - 1] != null);
+      for (let q = 1; q < pv.length; q++) {
+        const a = pv[q - 1], b = pv[q], gap = b - a, ra = rsiAt(r, a, hi), rb = rsiAt(r, b, hi);
+        if (!(gap >= cfg.gap[0] && gap <= cfg.gap[1] && sg * (c[b] - c[a]) > 0 && sg * (rb - ra) < -1)) continue;
+        const cb = Math.min(n - 1, b + cfg.R), end = Math.min(n - 1, b + cfg.recent);
+        let out = 'open', oj = null;
+        for (let j = b + 1; j <= end; j++) {
+          if (sg * (c[j] - c[b]) > 0) { out = 'failed'; oj = j; break; }
+          if (hi ? r[j] <= Z.lo : r[j] >= Z.hi) { out = 'played'; oj = j; break; }
+        }
+        if (out === 'open' && b + cfg.recent <= n - 1) out = 'expired';
+        const ej = oj != null ? oj : end, e0 = Math.min(cb, ej);
+        const move = c[ej] / c[e0] - 1;
+        let btc = move; if (bm) { const x0 = bm.get(D.t[e0]), x1 = bm.get(D.t[ej]); btc = x0 && x1 ? x1 / x0 - 1 : null; }
+        const btcUp = k === 'U' ? hi : !hi;
+        ev.push({ type: hi ? 'bear' : 'bull', hi, a, b, ra, rb, strong: hi ? ra >= Z.hi : ra <= Z.lo, t1: D.t[a], t2: D.t[b], tc: D.t[cb], p1: c[a], p2: c[b],
+          out, to: oj != null ? D.t[oj] : null, bars: ej - b, move, btc, btcUp, age: n - 1 - b });
+      }
+    }
+    ev.sort((x, y) => x.t2 - y.t2);
+    return (ECACHE[key] = { ev, D, r, n, Z, cfg });
+  }
+  function divergence(k, tf) {
+    const key = k + tf; if (key in DCACHE) return DCACHE[key];
+    const E = divEvents(k, tf); if (!E) return (DCACHE[key] = null);
+    const { D, r, n, Z, cfg } = E, c = D.c;
+    const live = E.ev.filter((e) => e.age <= cfg.recent).map((e) => Object.assign({}, e, { state: e.out === 'open' ? 'confirmed' : e.out }));
+    const res = live.slice();
+    for (const hi of [true, false]) { // second peak still forming (not confirmed by two lower closes yet)
+      const sg = hi ? 1 : -1;
+      if (live.some((e) => e.hi === hi && e.state === 'confirmed')) continue;
+      const pv = pivots(c, cfg.L, cfg.R, hi).filter((i) => r[i] != null && r[i - 1] != null); if (!pv.length) continue;
+      const a = pv[pv.length - 1]; let m = -1;
+      for (let j = Math.max(a + 1, n - 1 - cfg.R); j < n; j++) if (m < 0 || sg * (c[j] - c[m]) > 0) m = j;
+      if (m <= 0) continue;
+      let ext = true; for (let j = a + 1; j < n; j++) if (sg * (c[j] - c[m]) > 0) { ext = false; break; }
+      const gap = m - a, ra = rsiAt(r, a, hi), rm = r[m];
+      if (ext && rm != null && gap >= cfg.gap[0] && gap <= cfg.gap[1] && sg * (c[m] - c[a]) > 0 && sg * (rm - ra) < -1)
+        res.push({ type: hi ? 'bear' : 'bull', hi, a, b: m, ra, rb: rm, state: 'forming', strong: hi ? ra >= Z.hi : ra <= Z.lo, age: n - 1 - m, t1: D.t[a], t2: D.t[m], p1: c[a], p2: c[m], btcUp: k === 'U' ? hi : !hi });
+    }
+    const act = res.filter((x) => x.state === 'confirmed' || x.state === 'forming').sort((x, y) => x.age - y.age);
+    const best = act[0] || res.sort((x, y) => x.age - y.age)[0] || null;
+    return (DCACHE[key] = { best, all: res, rNow: r[n - 1], recent: r.slice(-8), Z });
+  }
+  const DLAB = { confirmed: 'confirmed', forming: 'forming, not confirmed yet', failed: 'failed', played: 'played out' };
+  function divCls(d) { const b = d && d.best; if (!b) return 'fl'; if (b.state === 'failed') return 'fl'; if (b.state === 'played') return 'pl'; if (b.state === 'forming') return 'fm'; return b.btcUp ? 'up' : 'dn'; }
+  function divText(k, tf, d, short) {
+    const b = d && d.best; const Z = d && d.Z;
+    if (!d) return short ? 'No data' : 'Not enough closed candles.';
+    if (!b) return short ? 'None' : 'No divergence on recent closed candles.';
+    const peak = b.hi ? 'high' : 'low';
+    const what = `${b.type === 'bear' ? 'Bearish' : 'Bullish'} · ${DLAB[b.state]}`;
+    const imp = b.state === 'failed' ? 'no signal now' : b.state === 'played' ? `RSI reached ${b.hi ? Z.lo : Z.hi} after ${b.bars} candle${b.bars === 1 ? '' : 's'}; BTC ${pct(b.btc)}` : b.btcUp ? 'points to BTC up' : 'points to BTC down';
+    const det = `Close ${peak}s ${fmtV(k, b.p1)} → ${fmtV(k, b.p2)}, RSI ${b.ra.toFixed(0)} → ${b.rb.toFixed(0)}${b.strong ? ` (first ${peak} ${b.hi ? 'at or above ' + Z.hi : 'at or below ' + Z.lo})` : ''}`;
+    const when = `${fd(b.t1, tf)} → ${fd(b.t2, tf)}${b.age ? ` · ${b.age} candle${b.age === 1 ? '' : 's'} ago` : ' · latest candle'}`;
+    return short ? `<b>${what}</b>${imp}<small>${det}<br>${when}</small>` : `<b>${what}</b> (${imp}). ${det}; ${when}.`;
+  }
+  function divLine(drv, tf) {
+    const d = divergence(drv, tf);
+    return `<p class="divline ${divCls(d)}">Divergence: ${divText(drv, tf, d, false)}</p>`;
+  }
+  function rollingFrom(d, hi) { // RSI was in the zone within the last 6 closes and has turned back
+    if (!d) return false; const rr = d.recent.filter((x) => x != null), Z = d.Z; if (rr.length < 2) return false;
+    const now = rr[rr.length - 1], prev = rr[rr.length - 2], was = rr.slice(-7, -1);
+    return hi ? was.some((x) => x >= Z.hi) && now < Z.hi && now < prev : was.some((x) => x <= Z.lo) && now > Z.lo && now > prev;
+  }
+  function drawDiv() {
+    DCACHE = {}; ECACHE = {};
+    const rows = SHOW.map((k) => `<tr><td>${NAME[k]}</td>${Object.keys(TF).map((tf) => { const d = divergence(k, tf); return `<td class="${divCls(d)}">${divText(k, tf, d, true)}</td>`; }).join('')}</tr>`).join('');
+    $('divGrid').innerHTML = `<thead><tr><th>Ticker</th>${Object.values(TF).map((t) => `<th>${t.short}</th>`).join('')}</tr></thead><tbody>${rows}</tbody>`;
+    const d1 = divergence('U', '1d'), h4 = divergence('U', '4h'), w1 = divergence('U', '1w');
+    const act = (d, type) => d && d.best && (d.best.state === 'confirmed' || d.best.state === 'forming') && d.best.type === type ? d.best : null;
+    const wk = w1 && w1.best && (w1.best.state === 'confirmed' || w1.best.state === 'forming') ? `Weekly context: ${w1.best.type === 'bear' ? 'bearish' : 'bullish'} divergence ${DLAB[w1.best.state]} on USDT.D + USDC.D (${w1.best.btcUp ? 'supports a BTC low' : 'supports a BTC high'}).` : `Weekly context: no active divergence on USDT.D + USDC.D${w1 && w1.rNow != null ? `; weekly RSI(7) ${w1.rNow.toFixed(1)}${w1.rNow >= w1.Z.hi ? ', elevated' : ''}` : ''}.`;
+    let html;
+    const dB = act(d1, 'bear'), dT = act(d1, 'bull');
+    if (dB || dT) {
+      const hi = !!dB, g = dB || dT, h = act(h4, hi ? 'bear' : 'bull'), roll = rollingFrom(h4, hi);
+      const trig = h ? `<b>4H trigger:</b> ${hi ? 'bearish' : 'bullish'} divergence ${DLAB[h.state]} on the 4H (${fd(h.t2, '4h')}).`
+        : roll ? `<b>4H trigger:</b> RSI(7) has rolled ${hi ? 'down from 70' : 'up from 30'} (now ${h4.rNow.toFixed(1)}).`
+        : `<b>4H: wait.</b> No 4H divergence or RSI turn yet${h4 && h4.rNow != null ? ` (4H RSI(7) ${h4.rNow.toFixed(1)})` : ''}.`;
+      html = `<div class="gate ${hi ? 'open' : 'top'}"><span class="gh">Daily gate open: ${hi ? 'bearish divergence on USDT.D + USDC.D, a BTC low setup (spot buy zone)' : 'bullish divergence on USDT.D + USDC.D, a BTC high setup (take-profit zone)'}${g.state === 'forming' ? ', still forming' : ''}.</span><span>${trig}</span><span class="gs">${wk}</span></div>`;
+    } else {
+      html = `<div class="gate"><span class="gh">Daily gate closed: no active divergence on daily USDT.D + USDC.D.</span><span class="gs">4H signals are ignored until the daily shows one. ${wk}</span></div>`;
+    }
+    $('divGate').innerHTML = html;
+    renderHist();
+  }
+  /* ---- divergence history ---- */
+  const OUTL = { played: 'Played out', failed: 'Failed', expired: 'Expired', open: 'Open' }, OUTC = { played: 'o-pl', failed: 'o-fl', expired: 'o-ex', open: 'o-op' };
+  let hk = 'U', htf = '1d';
+  try { const a = localStorage.getItem('div-hk'), b = localStorage.getItem('div-htf'); if (a && SHOW.includes(a)) hk = a; if (b && TF[b]) htf = b; } catch (e) {}
+  $('dhK').innerHTML = SHOW.map((k) => `<option value="${k}">${NAME[k]}</option>`).join('');
+  $('dhTf').innerHTML = Object.keys(TF).map((tf) => `<option value="${tf}">${TF[tf].label}</option>`).join('');
+  $('dhK').value = hk; $('dhTf').value = htf;
+  $('dhK').addEventListener('change', (e) => { hk = e.target.value; try { localStorage.setItem('div-hk', hk); } catch (er) {} renderHist(); });
+  $('dhTf').addEventListener('change', (e) => { htf = e.target.value; try { localStorage.setItem('div-htf', htf); } catch (er) {} renderHist(); });
+  const med = (a) => a.length ? q(a, 0.5) : null;
+  function sumRow(label, list, k) {
+    const done = list.filter((e) => e.out !== 'open'); if (!done.length) return `<div class="row"><b>${label}</b><span class="chip">none yet</span></div>`;
+    const pl = done.filter((e) => e.out === 'played'), fl = done.filter((e) => e.out === 'failed'), ex = done.filter((e) => e.out === 'expired');
+    const pr = (x) => Math.round(x.length / done.length * 100) + '%';
+    const btcR = pl.map((e) => e.btc).filter((x) => x != null), right = done.filter((e) => e.btc != null && (e.btcUp ? e.btc > 0 : e.btc < 0));
+    return `<div class="row"><b>${label}</b><span class="chip">${done.length} finished</span><span class="chip ${pl.length / done.length >= 0.55 ? 'ok' : ''}">played out ${pr(pl)}</span><span class="chip ${fl.length / done.length >= 0.4 ? 'bad' : ''}">failed ${pr(fl)}</span><span class="chip">expired ${pr(ex)}</span>${pl.length ? `<span class="chip">median ${Math.round(med(pl.map((e) => e.bars)))} candles to play out</span>` : ''}${btcR.length ? `<span class="chip">median BTC when played out ${pct(med(btcR))}</span>` : ''}<span class="chip">BTC moved the expected way ${Math.round(right.length / done.length * 100)}%</span></div>`;
+  }
+  function renderHist() {
+    const E = divEvents(hk, htf);
+    if (!E) { $('dhSum').innerHTML = '<span class="chip">Not enough saved candles for this ticker and timeframe.</span>'; $('dhTab').innerHTML = ''; $('dhFoot').textContent = ''; }
+    else {
+      const ev = E.ev, isB = hk === 'B';
+      const lb = (t) => `${t === 'bear' ? 'Bearish' : 'Bullish'} (${(hk === 'U' ? t === 'bear' : t === 'bull') ? 'BTC up' : 'BTC down'})`;
+      $('dhSum').innerHTML = ['bear', 'bull'].map((t) => { const l = ev.filter((e) => e.type === t); return sumRow(lb(t), l, hk) + sumRow(lb(t) + ' ★ only', l.filter((e) => e.strong), hk); }).join('');
+      const rows = ev.slice().reverse(), shown = rows.slice(0, 150);
+      $('dhTab').innerHTML = `<thead><tr><th>Second peak</th><th>Type</th><th>Closes</th><th>RSI</th><th>Outcome</th><th>Candles</th><th>${esc(NAME[hk])}</th>${isB ? '' : '<th>BTC</th>'}</tr></thead><tbody>${shown.map((e) => `<tr><td>${fd(e.t2, htf)}</td><td class="st">${e.type === 'bear' ? 'Bearish' : 'Bullish'}${e.strong ? ' ★' : ''}</td><td>${fmtV(hk, e.p1)} → ${fmtV(hk, e.p2)}</td><td>${e.ra.toFixed(0)} → ${e.rb.toFixed(0)}</td><td class="st ${OUTC[e.out]}">${OUTL[e.out]}${e.to ? ' ' + fd(e.to, htf) : ''}</td><td>${e.bars}</td><td class="${e.move >= 0 ? 'pos' : 'neg'}">${pct(e.move)}</td>${isB ? '' : `<td class="${e.btc == null ? '' : e.btc >= 0 ? 'pos' : 'neg'}">${pct(e.btc)}</td>`}</tr>`).join('')}</tbody>`;
+      $('dhFoot').textContent = `${ev.length} divergences since ${fd(E.D.t[0], htf)}${rows.length > shown.length ? `; table shows the latest ${shown.length}, the CSV has all` : ''}. Window: ${E.cfg.recent} candles after the second peak.`;
+    }
+    const lines = ['ticker,timeframe,type,strong,first_peak,second_peak,confirmed,close_1,close_2,rsi_1,rsi_2,outcome,outcome_candle,candles,ticker_move_pct,btc_move_pct,btc_expected'];
+    const iso = (t) => t == null ? '' : new Date(t * 1000).toISOString().slice(0, 16).replace('T', ' ');
+    for (const k of SHOW) for (const tf of Object.keys(TF)) { const E2 = divEvents(k, tf); if (!E2) continue;
+      for (const e of E2.ev) lines.push([NAME[k], TF[tf].short, e.type, e.strong ? 1 : 0, iso(e.t1), iso(e.t2), iso(e.tc), +e.p1.toPrecision(8), +e.p2.toPrecision(8), e.ra.toFixed(1), e.rb.toFixed(1), e.out, iso(e.to), e.bars, (e.move * 100).toFixed(2), e.btc == null ? '' : (e.btc * 100).toFixed(2), e.btcUp ? 'up' : 'down'].join(',')); }
+    $('dhCsv').value = lines.join('\n');
+  }
+
+  function drawGrid() {
+    const rows = SHOW.map((k) => `<tr><td>${NAME[k]}</td>${Object.keys(TF).map((tf) => {
+      const s = series(k, tf); if (!s || s.c.length < 10) return '<td>—</td>';
+      const cs = closedOnly(s, tf); const v = rsiSeries(cs.c).r.slice(-1)[0], lv = cs.c.length < s.c.length ? rsiSeries(s.c).r.slice(-1)[0] : null;
+      return `<td class="${zone(v, tf)}">${v.toFixed(1)}<small>${lv != null ? 'forming ' + lv.toFixed(1) + ' · ' : ''}${fmtV(k, s.c[s.c.length - 1])}</small></td>`;
+    }).join('')}</tr>`).join('');
+    $('grid').innerHTML = `<thead><tr><th>Ticker</th>${Object.values(TF).map((t) => `<th>${t.short}</th>`).join('')}</tr></thead><tbody>${rows}</tbody>`;
+  }
+  const LEDE = {
+    U: '<b>USDT.D + USDC.D</b> RSI(7) sets the swings on these cards; every RSI on the card is this one unless it says BTC. BTCUSD is shown for context only. Dates and levels come only from past swings; where there are too few, the card says so. Dominance RSI at 70 has tended to line up with BTC lows, and at 30 with BTC highs.',
+  };
+  function draw() {
+    CACHE = {}; WCACHE = null; SCACHE = {}; ACCCACHE = {};
+    drawGrid(); drawDiv();
+    document.querySelectorAll('#tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.v === view)));
+    $('lede').innerHTML = LEDE[view];
+    $('cards').innerHTML = Object.keys(TF).map((tf) => card(view, tf)).join('');
+  }
+  $('tabs').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    view = b.dataset.v; try { localStorage.setItem('src-view', view); } catch (er) {}
+    draw();
+  });
+
+  window.__src = {
+    TF, SYM, RAW,
+    setRaw(id, t, c, at) { RAW[id] = { t, c, at: at ? Date.parse(at) / 1000 : null }; SCACHE = {}; },
+    draw, forecasts, KEYS, SHOW,
+    setLog(key, rows) { LOG[key] = rows; },
+    _test: { rsiSeries, extremes, project, pivots, divergence, divEvents },
+  };
+})();
+</script>
+<script>
+/* ---------- saved snapshot + Refresh (same pattern as the Bitcoin Dashboard) ---------- */
+(function () {
+  const S = window.__src;
+  const $ = (id) => document.getElementById(id);
+  const SERVERS = ['Trading View', 'Trading_View'];
+  const GAP_MS = 1500, CHUNK = 1500;
+  const SOURCES = [];
+  for (const tf of Object.keys(S.TF).filter((x) => !S.TF[x].from)) for (const k of ['T', 'C', 'B']) {
+    const nm = { T: 'USDT.D', C: 'USDC.D', B: 'BTCUSD' }[k];
+    SOURCES.push([k + '_' + tf, `${nm} ${S.TF[tf].short}`, () => ({ symbol: S.SYM[k], interval: S.TF[tf].iv, count: S.TF[tf].count, format: 'columns' })]);
+  }
+  const FIX = {
+    needs_reauth: 'TradingView needs reconnecting. Reconnect it in claude.ai Settings → Connectors, then press Refresh again.',
+    server_not_connected: 'TradingView is not connected for you. Add it in claude.ai Settings → Connectors, then press Refresh again.',
+    selection_required: 'You have more than one TradingView connector. Choose one when claude.ai asks, then press Refresh again.',
+    approval_required: 'TradingView access needs your approval. Press Refresh again and allow it when asked.',
+    not_in_manifest: 'TradingView access is turned off for this page. Turn it on in the page permissions, then press Refresh again.',
+    blocked_by_policy: 'Your organization blocks this TradingView tool.',
+  };
+  const isQuota = (e) => /quota|suspend|suspicion|too many/i.test(String(e && e.message));
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const when = (iso) => new Date(iso).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+  const ago = (iso) => { const m = (Date.now() - Date.parse(iso)) / 6e4; if (m < 1) return 'just now'; if (m < 60) return Math.round(m) + ' min ago'; if (m < 2880) return Math.round(m / 60) + ' h ago'; return Math.round(m / 1440) + ' days ago'; };
+  let DB = null, MCP = null, SERVER = null, CAN_WRITE = false, RUNNING = false, META = null, lastAt = null, PMETA = null;
+  const BASE = {}, PATCH = {}, REJECT = {};
+  const secOf = (id) => S.TF[id.split('_')[1]].sec;
+  const effAt = () => { const a = META && META.at, b = PMETA && PMETA.at; return a && b ? (Date.parse(b) > Date.parse(a) ? b : a) : a || null; };
+  /* Merge a scheduled update over the saved history, but only if it checks out. */
+  function rebuild(id) {
+    const b = BASE[id]; if (!b) return;
+    const p = PATCH[id]; delete REJECT[id];
+    const bAt = Date.parse(b.at) / 1000;
+    if (!p || !(Date.parse(p.at) / 1000 > bAt)) { S.setRaw(id, b.t, b.c, b.at); return; }
+    const sec = secOf(id), pAt = Date.parse(p.at) / 1000;
+    const bad = (why) => { REJECT[id] = why; S.setRaw(id, b.t, b.c, b.at); };
+    if (!Array.isArray(p.t) || !Array.isArray(p.c) || p.t.length !== p.c.length || !p.t.length) return bad('malformed');
+    for (let i = 0; i < p.t.length; i++) {
+      if (!isFinite(p.t[i]) || !isFinite(p.c[i]) || p.c[i] <= 0) return bad('non-numeric value');
+      if (i && p.t[i] - p.t[i - 1] !== sec) return bad('candles not consecutive');
+    }
+    const idx = new Map(); b.t.forEach((t, i) => idx.set(t, i));
+    if (!idx.has(p.t[0])) return bad('does not overlap the saved history');
+    const t = b.t.slice(0, idx.get(p.t[0])), c = b.c.slice(0, idx.get(p.t[0]));
+    for (let i = 0; i < p.t.length; i++) {
+      const j = idx.get(p.t[i]);
+      if (j != null && b.t[j] + sec <= bAt && Math.abs(p.c[i] / b.c[j] - 1) > 0.005) return bad('a closed candle disagrees with the saved history');
+      const prev = c.length ? c[c.length - 1] : null;
+      if (prev && Math.abs(p.c[i] / prev - 1) > 0.35) return bad('an impossible jump between candles');
+      t.push(p.t[i]); c.push(p.c[i]);
+    }
+    S.setRaw(id, t, c, p.at);
+  }
+  const rebuildAll = () => SOURCES.forEach(([id]) => rebuild(id));
+  /* When the owner opens the page, fold checked scheduled updates into the saved history. */
+  let FOLDING = false, CAN_DB = false;
+  async function fold() {
+    if (FOLDING || RUNNING || !CAN_DB || !DB || !META || !PMETA) return;
+    const ids = SOURCES.map((s) => s[0]).filter((id) => BASE[id] && PATCH[id] && !REJECT[id] && Date.parse(PATCH[id].at) > Date.parse(BASE[id].at) && S.RAW[id]);
+    if (!ids.length) return;
+    FOLDING = true;
+    try {
+      const sources = Object.assign({}, META.sources || {});
+      for (const id of ids) {
+        const r = S.RAW[id], at = PATCH[id].at;
+        sources[id] = await saveSource(id, { t: r.t, c: r.c }, at);
+        BASE[id] = { t: r.t.slice(), c: r.c.slice(), at };
+      }
+      const meta = Object.assign({}, META, { sources, at: META.at });
+      META = meta; await DB.doc('snap/meta').set(meta);
+    } catch (e) { /* keep showing the merged view; it folds next time */ }
+    FOLDING = false;
+  }
+
+  /* Forecast history: subscribe once per card; append one entry per new closed candle. */
+  const LOGMAX = 120, LOGROWS = {}, LOGVER = {};
+  let LOGGING = false, logTimer = null;
+  const logKeys = () => { const a = []; for (const tf of Object.keys(S.TF)) for (const k of S.SHOW) a.push(k + '_' + tf); return a; };
+  function watchLog() {
+    for (const key of logKeys()) {
+      DB.doc('log/' + key).onSnapshot((snap) => {
+        const d = snap.exists ? snap.data() : null;
+        LOGROWS[key] = d && Array.isArray(d.rows) ? d.rows : [];
+        S.setLog(key, LOGROWS[key]);
+        clearTimeout(logTimer); logTimer = setTimeout(() => { if (META) { S.draw(); logNow(); } }, 150);
+      }, () => {});
+    }
+  }
+  async function logNow() {
+    if (LOGGING || RUNNING || !CAN_DB || !DB || !META) return;
+    if (missingIds().length || Object.keys(REJECT).length) return;            // only from clean data
+    if (!SOURCES.every(([id]) => S.RAW[id])) return;
+    LOGGING = true;
+    try {
+      for (const { key, e } of S.forecasts()) {
+        const rows = LOGROWS[key]; if (!rows) continue;                        // log not loaded yet: never overwrite
+        const last = rows[rows.length - 1];
+        if (last && last.c >= e.c) continue;                                   // already logged for this candle
+        const next = rows.concat([e]).slice(-LOGMAX);
+        LOGROWS[key] = next;
+        await DB.doc('log/' + key).set({ rows: next });
+      }
+    } catch (er) { /* try again on the next update */ }
+    LOGGING = false;
+  }
+  const missingIds = () => META ? SOURCES.map((s) => s[0]).filter((id) => (META.failed || []).includes(id) || !(META.sources && META.sources[id])) : [];
+  function banner(msg, kind) { const b = $('rfBanner'); b.hidden = !msg; b.textContent = msg || ''; b.className = 'rf-banner' + (kind ? ' ' + kind : ''); }
+  function showEmpty(title, note) {
+    $('rfEmpty').hidden = !title;
+    $('root').classList.toggle('no-data', !!title);
+    if (title) { $('rfEmptyTitle').textContent = title; $('rfEmptyNote').textContent = note || ''; }
+  }
+  function renderStatus() {
+    const at = effAt();
+    const sched = at && PMETA && at === PMETA.at;
+    $('rfAt').textContent = at ? `${sched ? 'Scheduled update' : 'Last refresh'} ${when(at)} · ${ago(at)}` : 'No saved snapshot yet';
+    const rj = Object.keys(REJECT);
+    $('rfRej').hidden = !rj.length;
+    $('rfRej').textContent = rj.length ? `Scheduled update rejected for ${rj.length} series (${rj.map((id) => SOURCES.find((s) => s[0] === id)[1] + ': ' + REJECT[id]).join('; ')}). They show your last full refresh. Press Refresh from TradingView to fix.` : '';
+    $('rfAt').className = 'rf-pill ' + (at ? 'acc' : '');
+    const lastDaily = new Date(); lastDaily.setUTCHours(0, 0, 0, 0);
+    const last4h = new Date(); last4h.setUTCHours(Math.floor(last4h.getUTCHours() / 4) * 4, 0, 0, 0);
+    const st = $('rfStale'), t = at ? Date.parse(at) : null;
+    if (t && t < +lastDaily) { st.hidden = false; st.textContent = 'New daily candle since this refresh'; }
+    else if (t && t < +last4h) { st.hidden = false; st.textContent = 'New 4H candle since this refresh'; }
+    else st.hidden = true;
+    const failed = missingIds();
+    $('rfFailed').hidden = !failed.length;
+    $('rfFailed').textContent = failed.length ? `${failed.length} series not loaded yet or kept from an older refresh` : '';
+    $('rfBtn').hidden = !CAN_WRITE; $('rfBtn').disabled = RUNNING;
+    $('rfMissing').hidden = !CAN_WRITE || RUNNING || !failed.length;
+  }
+  async function callTool(tool, args) {
+    let lastErr = null;
+    for (let i = 0; i < SERVERS.length; i++) {
+      const name = SERVER || SERVERS[i];
+      try {
+        const res = await MCP.callTool(name, tool, args, { cache: false });
+        SERVER = name;
+        let p = res.payload; if (typeof p === 'string') { try { p = JSON.parse(p); } catch (e) {} }
+        return p;
+      } catch (e) {
+        lastErr = e;
+        if (!SERVER && (e.code === 'server_not_connected' || e.code === 'not_in_manifest' || e.code === 'server_not_found') && i < SERVERS.length - 1) continue;
+        break;
+      }
+    }
+    throw lastErr;
+  }
+  async function fetchSource(src) {
+    const a = await callTool('mcp-tv-get-ohlcv', src[2]());
+    if (a && a.success === false) throw { code: 'tool_error', message: a.error || a.message || 'TradingView returned success: false' };
+    const b = a && a.bars;
+    if (!b || !Array.isArray(b.t) || !b.t.length) throw { code: 'tool_error', message: 'No bars in TradingView answer' };
+    const t = [], c = [];
+    b.t.forEach((x, i) => { const v = Number(b.c[i]); if (isFinite(v)) { t.push(Number(x)); c.push(v); } });
+    return { t, c };
+  }
+  const round = (v) => Math.abs(v) < 100 ? Math.round(v * 1e5) / 1e5 : Math.round(v * 100) / 100;
+  async function saveSource(id, got, at) {
+    const parts = Math.max(1, Math.ceil(got.t.length / CHUNK));
+    for (let k = 0; k < parts; k++) await DB.doc(`snap/${id}-${k}`).set({ t: got.t.slice(k * CHUNK, (k + 1) * CHUNK), c: got.c.slice(k * CHUNK, (k + 1) * CHUNK).map(round), part: k, parts, at });
+    return { at, rows: got.t.length, parts };
+  }
+  async function loadSource(id, info) {
+    const t = [], c = [];
+    for (let k = 0; k < info.parts; k++) {
+      const s = await DB.doc(`snap/${id}-${k}`).get();
+      if (!s.exists) throw new Error('missing part');
+      const d = s.data(); t.push(...d.t); c.push(...d.c);
+    }
+    return { t, c };
+  }
+  async function loadAll(meta) {
+    for (const [id] of SOURCES) {
+      const info = meta.sources && meta.sources[id];
+      if (!info) continue;
+      try { const g = await loadSource(id, info); BASE[id] = { t: g.t, c: g.c, at: info.at }; rebuild(id); } catch (e) {}
+    }
+  }
+  async function run(targets) {
+    if (RUNNING || !MCP || !DB || !targets.length) return;
+    RUNNING = true; renderStatus(); banner('');
+    $('rfBtn').textContent = 'Refreshing…';
+    $('rfProgWrap').hidden = false; $('rfText').hidden = false; $('rfProg').style.width = '0';
+    const IN = {}, failed = []; let stopped = null;
+    for (let i = 0; i < targets.length; i++) {
+      const src = targets[i];
+      $('rfText').textContent = `Pulling ${src[1]} from TradingView (${i + 1} of ${targets.length})…`;
+      try { IN[src[0]] = await fetchSource(src); }
+      catch (e) {
+        if (e && e.code === 'server_unavailable' && e.retryable) { await sleep(2500 + Math.random() * 1500); try { IN[src[0]] = await fetchSource(src); } catch (e2) { e = e2; } }
+        if (!IN[src[0]]) {
+          if (FIX[e && e.code]) { stopped = FIX[e.code]; failed.push(...targets.slice(i).map((t) => t[0])); break; }
+          if (isQuota(e)) { stopped = 'TradingView paused access for a minute because of the number of calls. What loaded is saved. Wait at least a minute, then press Fetch missing.'; failed.push(...targets.slice(i).map((t) => t[0])); break; }
+          failed.push(src[0]);
+        }
+      }
+      $('rfProg').style.width = Math.round(100 * (i + 1) / targets.length) + '%';
+      if (i < targets.length - 1) await sleep(GAP_MS);
+    }
+    const got = Object.keys(IN);
+    if (got.length) {
+      $('rfText').textContent = 'Recalculating and saving…';
+      try {
+        const at = new Date().toISOString();
+        const sources = Object.assign({}, (META && META.sources) || {});
+        for (const id of got) sources[id] = await saveSource(id, IN[id], at);
+        const missing = SOURCES.map((s) => s[0]).filter((id) => !sources[id] || failed.includes(id));
+        const meta = { at, sources, failed: missing, v: 1 };
+        lastAt = at;
+        await DB.doc('snap/meta').set(meta);
+        META = meta;
+        got.forEach((id) => { BASE[id] = { t: IN[id].t, c: IN[id].c.map(round), at }; rebuild(id); });
+        showEmpty(null); S.draw(); setTimeout(logNow, 400);
+      } catch (e) { stopped = stopped || 'Pulled the data but could not save the snapshot. Press Refresh again in a moment.'; }
+    }
+    RUNNING = false; $('rfProgWrap').hidden = true; $('rfText').hidden = true; $('rfProg').style.width = '0'; $('rfBtn').textContent = 'Refresh from TradingView';
+    if (stopped) banner(stopped, 'bad');
+    else if (failed.length) banner(`${got.length} of ${targets.length} series updated. ${failed.length} did not load (${failed.map((id) => SOURCES.find((s) => s[0] === id)[1]).join(', ')}); those keep their previous data. Press Fetch missing to retry them.`, '');
+    else banner(`All ${got.length} series updated and saved. Every projection is recalculated.`, 'ok');
+    renderStatus();
+  }
+  async function boot() {
+    const [db, user, mcp] = await Promise.all([claude.use('db'), claude.use('user'), claude.use('mcp')]);
+    DB = db; MCP = mcp;
+    try { CAN_WRITE = user ? !!(await user.isOwner()) || !!(await user.canEdit()) : false; } catch (e) { CAN_WRITE = false; }
+    CAN_DB = CAN_WRITE;
+    if (!MCP) CAN_WRITE = false;
+    if (!DB) { showEmpty('Saved data is not available here', 'Open this page in claude.ai to see the last saved snapshot.'); renderStatus(); return; }
+    renderStatus();
+    watchLog();
+    DB.doc('snap/meta').onSnapshot(async (snap) => {
+      const meta = snap.exists ? snap.data() : null;
+      if (!meta) {
+        META = null;
+        showEmpty('No saved snapshot yet', CAN_WRITE ? 'Press Refresh from TradingView to pull the first snapshot. It takes about 20 seconds and is saved for next time.' : 'The owner of this page has not saved a snapshot yet.');
+        renderStatus(); return;
+      }
+      if (meta.at !== lastAt && !RUNNING) {
+        lastAt = meta.at; META = meta;
+        await loadAll(meta);
+        showEmpty(null); S.draw(); fold(); setTimeout(logNow, 400);
+      } else META = meta;
+      renderStatus();
+    }, () => { banner('Lost the connection to the saved snapshot. Reload the page.', 'bad'); });
+    DB.doc('patch/_meta').onSnapshot(async (snap) => {
+      const pm = snap.exists ? snap.data() : null;
+      if (!pm || (PMETA && PMETA.at === pm.at)) { if (!pm) PMETA = null; return; }
+      for (const [id] of SOURCES) {
+        try { const d = await DB.doc('patch/' + id).get(); if (d.exists) PATCH[id] = d.data(); } catch (e) {}
+      }
+      PMETA = pm; rebuildAll();
+      if (META) { showEmpty(null); S.draw(); fold(); setTimeout(logNow, 400); }
+      renderStatus();
+    }, () => {});
+    $('rfBtn').addEventListener('click', () => run(SOURCES.slice()));
+    $('rfMissing').addEventListener('click', () => { const ids = missingIds(); run(SOURCES.filter((s) => ids.includes(s[0]))); });
+    setInterval(renderStatus, 60000);
+  }
+  showEmpty('Loading the last saved snapshot…', 'The dashboard shows your last refresh. Nothing is pulled from TradingView until you press Refresh.');
+  if (window.claude && window.claude.use) boot();
+  else showEmpty('Saved data is not available here', 'Open this page in claude.ai to see the last saved snapshot.');
+})();
+</script>
+
+
+<script src="cloud.js"></script>

@@ -1,0 +1,14 @@
+{
+ "_about": "Which shared series (mbzazad-max/market-data) feeds each saved-snapshot document of the original page. The page's own Refresh asks TradingView for CRYPTOCAP:USDT.D, CRYPTOCAP:USDC.D and COINBASE:BTCUSD on 4H (6,500 candles), 1D (5,000) and 1W (520); it works out 8H and 3D itself. Here: BTC is the stored Coinbase BTCUSD history (frozen), then Binance BTCUSDT (laptop upload) for every later candle. USDT.D and USDC.D daily history is stored once (frozen, TradingView answer of 13 Nov 2026); every later day is made from the 4H series the daily 11:30 task loads (a UTC day counts once its 20:00 candle has closed). Weekly bars are built from closed daily candles (Monday weeks), exactly like TradingView's weekly bars. No TradingView calls are made by this repo.",
+ "sources": {
+  "T_4h": { "series_4h": "tv/CRYPTOCAP_USDT.D/4H", "use": "4H", "last": 6500 },
+  "C_4h": { "series_4h": "tv/CRYPTOCAP_USDC.D/4H", "use": "4H", "last": 6500 },
+  "B_4h": { "series_4h": "tv/COINBASE_BTCUSD/4H", "then_4h": "binance/BTCUSDT/4H", "use": "4H", "last": 6500 },
+  "T_1d": { "series": "tv/CRYPTOCAP_USDT.D/1D", "then_days_from_4h": "tv/CRYPTOCAP_USDT.D/4H", "use": "1D", "last": 5000 },
+  "C_1d": { "series": "tv/CRYPTOCAP_USDC.D/1D", "then_days_from_4h": "tv/CRYPTOCAP_USDC.D/4H", "use": "1D", "last": 5000 },
+  "B_1d": { "series": "tv/COINBASE_BTCUSD/1D", "then": "binance/BTCUSDT/1D", "use": "1D", "last": 5000 },
+  "T_1w": { "series": "tv/CRYPTOCAP_USDT.D/1D", "then_days_from_4h": "tv/CRYPTOCAP_USDT.D/4H", "use": "1W", "last": 520 },
+  "C_1w": { "series": "tv/CRYPTOCAP_USDC.D/1D", "then_days_from_4h": "tv/CRYPTOCAP_USDC.D/4H", "use": "1W", "last": 520 },
+  "B_1w": { "series": "tv/COINBASE_BTCUSD/1D", "then": "binance/BTCUSDT/1D", "use": "1W", "last": 520 }
+ }
+}

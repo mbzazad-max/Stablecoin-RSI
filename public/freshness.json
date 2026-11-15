@@ -1,14 +1,14 @@
 {
- "generated": "2026-11-15 06:52 UTC",
- "checked_at": 1794725533,
- "input_hash": "4e5b07e52ca4619ca6d58c804efbacd96d99242e9b1df97b78bc420bc4b4a2b6",
+ "generated": "2026-11-15 07:23 UTC",
+ "checked_at": 1794727397,
+ "input_hash": "5f3f18631f47d1c65a2a2b08939d0749d497ad9521dc3c39ddb7d892c0959cf8",
  "series": [
   {
    "id": "T_4h",
    "symbol": "USDT.D",
    "tf": "4H",
    "source": "tv/CRYPTOCAP_USDT.D/4H",
-   "last_close": 1794700800,
+   "last_close": 1794715200,
    "period_s": 14400
   },
   {
@@ -16,7 +16,7 @@
    "symbol": "USDC.D",
    "tf": "4H",
    "source": "tv/CRYPTOCAP_USDC.D/4H",
-   "last_close": 1794700800,
+   "last_close": 1794715200,
    "period_s": 14400
   },
   {

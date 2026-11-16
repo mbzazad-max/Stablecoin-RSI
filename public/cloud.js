@@ -68,3 +68,20 @@
   loadFresh();
   poll(0);
 })();
+
+/* "← Dashboards" link back to the home site, same as the Data check page. Added on Cloudflare only; the page itself is unchanged. */
+(function () {
+  'use strict';
+  var st = document.createElement('style');
+  st.textContent = '.dash-back{display:inline-block;font-size:13px;line-height:1.4;color:var(--muted,var(--color-fg-muted,#586878));text-decoration:none;white-space:nowrap}' +
+    '.dash-back:hover{text-decoration:underline}.dash-back-row{margin:0 0 6px}';
+  document.head.appendChild(st);
+  var a = document.createElement('a'); a.className = 'dash-back'; a.href = '/'; a.textContent = '← Dashboards';
+  a.title = 'Back to the list of dashboards';
+  var host = document.body.firstElementChild;
+  while (host && (/^(SCRIPT|STYLE|LINK|META|NOSCRIPT|TITLE|TEMPLATE)$/.test(host.tagName) || getComputedStyle(host).display === 'none')) host = host.nextElementSibling;
+  var row = document.createElement('div'); row.className = 'dash-back-row'; row.appendChild(a);
+  if (host && host.classList.contains('fx-bar')) { a.style.marginRight = '6px'; host.insertBefore(a, host.firstChild); }
+  else if (host) host.insertBefore(row, host.firstChild);
+  else document.body.insertBefore(row, document.body.firstChild);
+})();

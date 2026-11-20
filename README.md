@@ -45,3 +45,7 @@ behaviour, not financial advice.
 **Secrets** (repo Settings → Secrets and variables → Actions → Repository secrets): `MARKET_DATA_TOKEN` (token A,
 "coin-zones automation"; it also becomes the Worker's GITHUB_TOKEN for the Refresh button), `CLOUDFLARE_API_TOKEN`,
 `CLOUDFLARE_ACCOUNT_ID` (32 characters).
+
+## USDT.D only view (20 Nov 2026)
+
+Owner's request. A switch at the top: "USDT.D + USDC.D" (the original page) or "USDT.D only" (`?view=usdt`). `build/usdt_view.js` writes `public/snapshot_usdt.json` = the same documents with USDC.D set to 0 on the USDT.D candle times, so the unchanged page runs every card (RSI(7) swings, BTC level, divergences, weekly forecast) on USDT.D alone over its full history; `shim.js` loads it in that view and `cloud.js` relabels "USDT.D + USDC.D" to "USDT.D" on screen. Study figures quoted in the page text were measured on the sum. The view has its own forecast history (`SNAP=public/snapshot_usdt.json node build/log.js`), from 20 Nov 2026. Page file unchanged.

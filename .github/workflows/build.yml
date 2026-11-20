@@ -49,11 +49,13 @@ jobs:
         run: |
           mkdir -p /tmp/nm && (cd /tmp/nm && npm init -y >/dev/null && npm i --no-save --silent jsdom@24)
           node build/log.js /tmp/nm/node_modules
+          node build/usdt_view.js
+          SNAP=public/snapshot_usdt.json node build/log.js /tmp/nm/node_modules
       - name: Save the new snapshot (one commit)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/snapshot.json public/freshness.json
+          git add public/snapshot.json public/snapshot_usdt.json public/freshness.json
           if git diff --cached --quiet; then echo "Nothing changed."; exit 0; fi
           git commit -q -m "Dashboard build $(node -p "require('./public/freshness.json').generated")"
           for i in 1 2 3 4 5; do git push -q origin HEAD:main && exit 0; git pull -q --rebase origin main; sleep $((i*2)); done

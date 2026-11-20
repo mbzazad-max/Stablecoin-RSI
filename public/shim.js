@@ -8,7 +8,7 @@
   'use strict';
   var all = null;
   function load() {
-    if (!all) all = fetch('snapshot.json', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+    if (!all) all = fetch(/[?&]view=usdt\b/.test(location.search) ? 'snapshot_usdt.json' : 'snapshot.json', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
     return all;
   }
   function snap(docs, p) { var d = docs[p]; return { id: p.split('/').pop(), exists: d != null, data: function () { return d == null ? undefined : JSON.parse(JSON.stringify(d)); }, metadata: {} }; }

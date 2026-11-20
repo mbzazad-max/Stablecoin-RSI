@@ -85,3 +85,36 @@
   else if (host) host.insertBefore(row, host.firstChild);
   else document.body.insertBefore(row, document.body.firstChild);
 })();
+
+/* View switch (owner, 20 Nov 2026): "USDT.D + USDC.D" (the original page) or "USDT.D only". The USDT.D only view loads
+   snapshot_usdt.json (shim.js), in which USDC.D is zero, so the page's own unchanged logic runs on USDT.D alone; the page's
+   labels are rewritten from "USDT.D + USDC.D" to "USDT.D" on screen. Study figures quoted in the page text were measured on
+   USDT.D + USDC.D. The view keeps its own forecast history, starting 20 Nov 2026. */
+(function () {
+  'use strict';
+  var usdt = /[?&]view=usdt\b/.test(location.search);
+  var st = document.createElement('style');
+  st.textContent = '.vw-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:0 0 8px;font-size:13px}' +
+    '.vw-row a{padding:3px 10px;border:1px solid var(--line,#d0d7de);border-radius:999px;text-decoration:none;color:inherit}' +
+    '.vw-row a[aria-current]{background:var(--fg,#1f2328);color:var(--bg,#fff);border-color:transparent}' +
+    '.vw-note{font-size:12px;opacity:.8;margin:0 0 8px}';
+  document.head.appendChild(st);
+  var row = document.createElement('div'); row.className = 'vw-row';
+  row.innerHTML = '<span>View:</span><a href="./"' + (usdt ? '' : ' aria-current="page"') + '>USDT.D + USDC.D</a><a href="./?view=usdt"' + (usdt ? ' aria-current="page"' : '') + '>USDT.D only</a>';
+  var back = document.querySelector('.dash-back-row') || document.querySelector('.dash-back');
+  var host = back ? (back.classList.contains('dash-back-row') ? back : back.parentNode) : document.body.firstElementChild;
+  host.parentNode.insertBefore(row, host.nextSibling);
+  if (!usdt) return;
+  var note = document.createElement('p'); note.className = 'vw-note';
+  note.textContent = 'USDT.D only: every card uses the same rules on USDT.D alone (USDC.D left out). Hit rates and study figures quoted in the text were measured on USDT.D + USDC.D. Forecast history for this view starts 20 Nov 2026.';
+  row.parentNode.insertBefore(note, row.nextSibling);
+  var RX = [[/USDT\.D\s*\+\s*USDC\.D/g, 'USDT.D'], [/USDT\s*\+\s*USDC/g, 'USDT'], [/USDT\.D\+USDC\.D/g, 'USDT.D']];
+  var fix = function (n) {
+    if (n.nodeType === 3) { var v = n.nodeValue, w = v; RX.forEach(function (r) { w = w.replace(r[0], r[1]); }); if (w !== v) n.nodeValue = w; return; }
+    if (n.nodeType !== 1 || /^(SCRIPT|STYLE)$/.test(n.tagName) || n === note || n === row) return;
+    for (var c = n.firstChild; c; c = c.nextSibling) fix(c);
+  };
+  fix(document.body); document.title = document.title.replace(/USDT\.D\s*\+\s*USDC\.D/g, 'USDT.D');
+  new MutationObserver(function (ms) { ms.forEach(function (m) { if (m.type === 'characterData') fix(m.target); else m.addedNodes.forEach(fix); }); })
+    .observe(document.body, { childList: true, subtree: true, characterData: true });
+})();

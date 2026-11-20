@@ -10,7 +10,7 @@
 'use strict';
 const fs = require('fs'), path = require('path');
 const NM = path.resolve(process.argv[2] || 'node_modules');
-const ROOT = path.resolve(__dirname, '..'), PUB = path.join(ROOT, 'public'), SNAP = path.join(PUB, 'snapshot.json');
+const ROOT = path.resolve(__dirname, '..'), PUB = path.join(ROOT, 'public'), SNAP = path.resolve(process.env.SNAP || path.join(PUB, 'snapshot.json'));   // SNAP=public/snapshot_usdt.json for the USDT.D only view
 const LOGMAX = 120;
 
 function pageForecasts(snapshot) {

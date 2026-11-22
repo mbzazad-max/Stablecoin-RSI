@@ -1,7 +1,7 @@
 {
- "generated": "2026-11-22 00:15 UTC",
- "checked_at": 1795306542,
- "input_hash": "04d759537aca63d9f60390960032c0d2604ca1198bc5068ffaf88cb1553aa417",
+ "generated": "2026-11-22 00:25 UTC",
+ "checked_at": 1795307157,
+ "input_hash": "9cfdee9606469fb90880df269ad57232be536f1e84ecec0967eb7e7118113878",
  "series": [
   {
    "id": "binance/BTCUSDT/1D",
@@ -69,10 +69,10 @@
    "symbol": "USDC.D",
    "tf": "4H",
    "period_s": 14400,
-   "last_open": 1795276800,
-   "last_close": 1795291200,
-   "fetched_at": 1795306079,
-   "rows": 1949,
+   "last_open": 1795291200,
+   "last_close": 1795305600,
+   "fetched_at": 1795307000,
+   "rows": 1950,
    "frozen": false
   },
   {
@@ -93,23 +93,14 @@
    "symbol": "USDT.D",
    "tf": "4H",
    "period_s": 14400,
-   "last_open": 1795276800,
-   "last_close": 1795291200,
-   "fetched_at": 1795306009,
-   "rows": 6335,
+   "last_open": 1795291200,
+   "last_close": 1795305600,
+   "fetched_at": 1795307000,
+   "rows": 6336,
    "frozen": false
   }
  ],
  "readings": [],
- "kept": [
-  {
-   "id": "T_4h",
-   "why": "impossible jump at 2026-11-21 08:00 UTC"
-  },
-  {
-   "id": "C_4h",
-   "why": "impossible jump at 2026-11-21 08:00 UTC"
-  }
- ],
- "last_result": "2 source(s) kept their last good data."
+ "kept": [],
+ "last_result": "All sources built from closed candles."
 }

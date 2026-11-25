@@ -1,7 +1,7 @@
 {
- "generated": "2026-11-25 21:01 UTC",
- "checked_at": 1795640495,
- "input_hash": "1eb68947512561adf75f8e3b3b55fcdb6a551faeb4cca4b5b06b0959a404cf06",
+ "generated": "2026-11-25 21:04 UTC",
+ "checked_at": 1795640656,
+ "input_hash": "4c410b69363a94f2f291c76d0b72d9ad02b087e0664c4ea0c75416d7a77fc6df",
  "series": [
   {
    "id": "binance/BTCUSDT/1D",
@@ -69,10 +69,10 @@
    "symbol": "USDC.D",
    "tf": "4H",
    "period_s": 14400,
-   "last_open": 1795608000,
-   "last_close": 1795622400,
-   "fetched_at": 1795625168,
-   "rows": 1972,
+   "last_open": 1795622400,
+   "last_close": 1795636800,
+   "fetched_at": 1795639342,
+   "rows": 1973,
    "frozen": false
   },
   {
